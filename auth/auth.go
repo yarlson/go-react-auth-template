@@ -10,10 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"goauth/repository"
-
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
+
+	"goauth/repository"
+
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -21,7 +22,7 @@ import (
 type UserIdContextKey struct{}
 
 type UserRepository interface {
-	GetOrCreateUser(email string) (repository.User, error)
+	GetOrCreateUser(email string, firstName string, lastName string) (repository.User, error)
 	GetUserByID(id uint) (repository.User, error)
 }
 
@@ -43,8 +44,11 @@ func NewAuth(userRepo repository.UserRepository, tokenRepo repository.TokenRepos
 			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 			RedirectURL:  "http://localhost:8080/auth/google/callback",
-			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email"},
-			Endpoint:     google.Endpoint,
+			Scopes: []string{
+				"https://www.googleapis.com/auth/userinfo.email",
+				"https://www.googleapis.com/auth/userinfo.profile",
+			},
+			Endpoint: google.Endpoint,
 		},
 		userRepo:  userRepo,
 		tokenRepo: tokenRepo,
@@ -73,14 +77,16 @@ func (a *Auth) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 
 	var userInfo struct {
-		Email string `json:"email"`
+		Email     string `json:"email"`
+		FirstName string `json:"given_name"`
+		LastName  string `json:"family_name"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
 		http.Error(w, "Failed to decode user info: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	user, err := a.userRepo.GetOrCreateUser(userInfo.Email)
+	user, err := a.userRepo.GetOrCreateUser(userInfo.Email, userInfo.FirstName, userInfo.LastName)
 	if err != nil {
 		http.Error(w, "Failed to process user: "+err.Error(), http.StatusInternalServerError)
 		return

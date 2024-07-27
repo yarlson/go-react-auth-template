@@ -8,7 +8,9 @@ import (
 
 type User struct {
 	gorm.Model
-	Email string `gorm:"uniqueIndex"`
+	Email     string `gorm:"uniqueIndex"`
+	FirstName string
+	LastName  string
 }
 
 type RefreshToken struct {
@@ -19,7 +21,7 @@ type RefreshToken struct {
 }
 
 type UserRepository interface {
-	GetOrCreateUser(email string) (User, error)
+	GetOrCreateUser(email, firstName, lastName string) (User, error)
 	GetUserByID(id uint) (User, error)
 }
 
@@ -45,9 +47,9 @@ func NewGormTokenRepository(db *gorm.DB) *GormTokenRepository {
 	return &GormTokenRepository{db: db}
 }
 
-func (r *GormUserRepository) GetOrCreateUser(email string) (User, error) {
+func (r *GormUserRepository) GetOrCreateUser(email, firstName, lastName string) (User, error) {
 	var user User
-	result := r.db.Where(User{Email: email}).FirstOrCreate(&user)
+	result := r.db.Where(User{Email: email}).FirstOrCreate(&user, User{Email: email, FirstName: firstName, LastName: lastName})
 	return user, result.Error
 }
 
