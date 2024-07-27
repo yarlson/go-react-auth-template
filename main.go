@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"goauth/auth"
+	"goauth/provider/google"
 	"goauth/repository"
 
 	"github.com/go-chi/chi/v5"
@@ -36,8 +37,11 @@ func main() {
 	userRepo := repository.NewGormUserRepository(db)
 	tokenRepo := repository.NewGormTokenRepository(db)
 
+	// Initialize Google auth provider
+	googleAuthProvider := google.NewGoogleAuthProvider(os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"))
+
 	// Initialize auth
-	authHandler := auth.NewAuth(userRepo, tokenRepo)
+	authHandler := auth.NewAuth(userRepo, tokenRepo, googleAuthProvider)
 
 	// Set up chi router
 	r := chi.NewRouter()
@@ -59,7 +63,7 @@ func main() {
 
 func handleUserProfile(userRepo repository.UserRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value("userID").(uint)
+		userID := r.Context().Value(auth.UserIdContextKey{}).(uint)
 		user, err := userRepo.GetUserByID(userID)
 		if err != nil {
 			http.Error(w, "User not found", http.StatusNotFound)
@@ -68,8 +72,10 @@ func handleUserProfile(userRepo repository.UserRepository) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":    user.ID,
-			"email": user.Email,
+			"id":        user.ID,
+			"email":     user.Email,
+			"firstName": user.FirstName,
+			"lastName":  user.LastName,
 		})
 	}
 }

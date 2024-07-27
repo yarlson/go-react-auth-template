@@ -10,13 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt"
-	"github.com/google/uuid"
-
+	"goauth/provider/google"
 	"goauth/repository"
 
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
+	"github.com/golang-jwt/jwt"
+	"github.com/google/uuid"
 )
 
 type UserIdContextKey struct{}
@@ -33,60 +31,39 @@ type TokenRepository interface {
 }
 
 type Auth struct {
-	googleOauthConfig *oauth2.Config
-	userRepo          UserRepository
-	tokenRepo         TokenRepository
+	userRepo           UserRepository
+	tokenRepo          TokenRepository
+	googleAuthProvider *google.AuthProvider
 }
 
-func NewAuth(userRepo repository.UserRepository, tokenRepo repository.TokenRepository) *Auth {
+func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, googleAuthProvider *google.AuthProvider) *Auth {
 	return &Auth{
-		googleOauthConfig: &oauth2.Config{
-			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
-			RedirectURL:  "http://localhost:8080/auth/google/callback",
-			Scopes: []string{
-				"https://www.googleapis.com/auth/userinfo.email",
-				"https://www.googleapis.com/auth/userinfo.profile",
-			},
-			Endpoint: google.Endpoint,
-		},
-		userRepo:  userRepo,
-		tokenRepo: tokenRepo,
+		userRepo:           userRepo,
+		tokenRepo:          tokenRepo,
+		googleAuthProvider: googleAuthProvider,
 	}
 }
 
 func (a *Auth) HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
-	url := a.googleOauthConfig.AuthCodeURL("state", oauth2.AccessTypeOffline)
+	url := a.googleAuthProvider.GetAuthURL()
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func (a *Auth) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
-	token, err := a.googleOauthConfig.Exchange(context.Background(), code)
+	token, err := a.googleAuthProvider.ExchangeCode(code)
 	if err != nil {
 		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	client := a.googleOauthConfig.Client(context.Background(), token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	googleUser, err := a.googleAuthProvider.GetUserInfo(token)
 	if err != nil {
 		http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer resp.Body.Close()
 
-	var userInfo struct {
-		Email     string `json:"email"`
-		FirstName string `json:"given_name"`
-		LastName  string `json:"family_name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		http.Error(w, "Failed to decode user info: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	user, err := a.userRepo.GetOrCreateUser(userInfo.Email, userInfo.FirstName, userInfo.LastName)
+	user, err := a.userRepo.GetOrCreateUser(googleUser.Email, googleUser.FirstName, googleUser.LastName)
 	if err != nil {
 		http.Error(w, "Failed to process user: "+err.Error(), http.StatusInternalServerError)
 		return
