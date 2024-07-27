@@ -52,8 +52,9 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/auth/google", authHandler.HandleGoogleLogin)
-	r.Get("/auth/google/callback", authHandler.HandleGoogleCallback)
+	r.Get("/auth/google", authHandler.HandleLogin)
+	r.Get("/auth/google/callback", authHandler.HandleCallback)
+
 	r.Post("/auth/refresh", authHandler.HandleRefreshToken)
 
 	r.Group(func(r chi.Router) {

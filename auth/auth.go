@@ -39,33 +39,33 @@ type Provider interface {
 }
 
 type Auth struct {
-	userRepo           UserRepository
-	tokenRepo          TokenRepository
-	googleAuthProvider Provider
+	userRepo     UserRepository
+	tokenRepo    TokenRepository
+	authProvider Provider
 }
 
 func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, authProvider Provider) *Auth {
 	return &Auth{
-		userRepo:           userRepo,
-		tokenRepo:          tokenRepo,
-		googleAuthProvider: authProvider,
+		userRepo:     userRepo,
+		tokenRepo:    tokenRepo,
+		authProvider: authProvider,
 	}
 }
 
-func (a *Auth) HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
-	url := a.googleAuthProvider.GetAuthURL()
+func (a *Auth) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	url := a.authProvider.GetAuthURL()
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func (a *Auth) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
+func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
-	token, err := a.googleAuthProvider.ExchangeCode(code)
+	token, err := a.authProvider.ExchangeCode(code)
 	if err != nil {
 		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	googleUser, err := a.googleAuthProvider.GetUserInfo(token)
+	googleUser, err := a.authProvider.GetUserInfo(token)
 	if err != nil {
 		http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
 		return
