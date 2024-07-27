@@ -45,12 +45,12 @@ type Auth struct {
 	jwtSecret    []byte
 }
 
-func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, authProvider Provider) *Auth {
+func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, authProvider Provider, jwtSecret string) *Auth {
 	return &Auth{
 		userRepo:     userRepo,
 		tokenRepo:    tokenRepo,
 		authProvider: authProvider,
-		jwtSecret:    []byte(os.Getenv("JWT_SECRET")),
+		jwtSecret:    []byte(jwtSecret),
 	}
 }
 

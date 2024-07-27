@@ -14,12 +14,12 @@ type AuthProvider struct {
 	hostedDomain string
 }
 
-func NewAuthProvider(clientID, clientSecret, hostedDomain string) *AuthProvider {
+func NewAuthProvider(clientID, clientSecret, hostedDomain, redirectURL string) *AuthProvider {
 	return &AuthProvider{
 		oauthConfig: &oauth2.Config{
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
-			RedirectURL:  "http://localhost:8080/auth/google/callback",
+			RedirectURL:  redirectURL,
 			Scopes: []string{
 				"https://www.googleapis.com/auth/userinfo.email",
 				"https://www.googleapis.com/auth/userinfo.profile",

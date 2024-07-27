@@ -42,10 +42,11 @@ func main() {
 		os.Getenv("GOOGLE_CLIENT_ID"),
 		os.Getenv("GOOGLE_CLIENT_SECRET"),
 		os.Getenv("GOOGLE_HOSTED_DOMAIN"),
+		os.Getenv("GOOGLE_REDIRECT_URL"),
 	)
 
 	// Initialize auth
-	authHandler := auth.NewAuth(userRepo, tokenRepo, googleAuthProvider)
+	authHandler := auth.NewAuth(userRepo, tokenRepo, googleAuthProvider, os.Getenv("JWT_SECRET"))
 
 	// Set up chi router
 	r := chi.NewRouter()
