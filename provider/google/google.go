@@ -15,10 +15,11 @@ type User struct {
 }
 
 type AuthProvider struct {
-	oauthConfig *oauth2.Config
+	oauthConfig  *oauth2.Config
+	hostedDomain string
 }
 
-func NewGoogleAuthProvider(clientID string, clientSecret string) *AuthProvider {
+func NewAuthProvider(clientID, clientSecret, hostedDomain string) *AuthProvider {
 	return &AuthProvider{
 		oauthConfig: &oauth2.Config{
 			ClientID:     clientID,
@@ -30,11 +31,16 @@ func NewGoogleAuthProvider(clientID string, clientSecret string) *AuthProvider {
 			},
 			Endpoint: google.Endpoint,
 		},
+		hostedDomain: hostedDomain,
 	}
 }
 
 func (g *AuthProvider) GetAuthURL() string {
-	return g.oauthConfig.AuthCodeURL("state", oauth2.AccessTypeOffline)
+	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
+	if g.hostedDomain != "" {
+		opts = append(opts, oauth2.SetAuthURLParam("hd", g.hostedDomain))
+	}
+	return g.oauthConfig.AuthCodeURL("state", opts...)
 }
 
 func (g *AuthProvider) ExchangeCode(code string) (*oauth2.Token, error) {

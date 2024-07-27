@@ -38,7 +38,11 @@ func main() {
 	tokenRepo := repository.NewGormTokenRepository(db)
 
 	// Initialize Google auth provider
-	googleAuthProvider := google.NewGoogleAuthProvider(os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"))
+	googleAuthProvider := google.NewAuthProvider(
+		os.Getenv("GOOGLE_CLIENT_ID"),
+		os.Getenv("GOOGLE_CLIENT_SECRET"),
+		os.Getenv("GOOGLE_HOSTED_DOMAIN"),
+	)
 
 	// Initialize auth
 	authHandler := auth.NewAuth(userRepo, tokenRepo, googleAuthProvider)
