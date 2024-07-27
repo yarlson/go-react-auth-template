@@ -29,7 +29,7 @@ type UserRepository interface {
 type TokenRepository interface {
 	StoreRefreshToken(userID uint, refreshToken string) error
 	VerifyRefreshToken(refreshToken string) (uint, error)
-	UpdateRefreshToken(userID uint, newRefreshToken string) error
+	UpdateRefreshToken(userID uint, oldRefreshToken, newRefreshToken string) error
 }
 
 type Provider interface {
@@ -42,6 +42,7 @@ type Auth struct {
 	userRepo     UserRepository
 	tokenRepo    TokenRepository
 	authProvider Provider
+	jwtSecret    []byte
 }
 
 func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, authProvider Provider) *Auth {
@@ -49,6 +50,7 @@ func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, authProvider Pr
 		userRepo:     userRepo,
 		tokenRepo:    tokenRepo,
 		authProvider: authProvider,
+		jwtSecret:    []byte(os.Getenv("JWT_SECRET")),
 	}
 }
 
@@ -105,7 +107,7 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 		RefreshToken string `json:"refreshToken"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -116,9 +118,9 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate new JWT
-	tokenString, err := a.GenerateJWT(userID)
+	newJWT, err := a.GenerateJWT(userID)
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		http.Error(w, "Failed to generate JWT", http.StatusInternalServerError)
 		return
 	}
 
@@ -126,14 +128,15 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	newRefreshToken := a.GenerateRefreshToken()
 
 	// Update refresh token in database
-	if err := a.tokenRepo.UpdateRefreshToken(userID, newRefreshToken); err != nil {
+	if err := a.tokenRepo.UpdateRefreshToken(userID, request.RefreshToken, newRefreshToken); err != nil {
 		http.Error(w, "Failed to update refresh token", http.StatusInternalServerError)
 		return
 	}
 
+	// 4. Send both new tokens back to the client
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{
-		"token":        tokenString,
+		"token":        newJWT,
 		"refreshToken": newRefreshToken,
 	})
 }
@@ -161,9 +164,10 @@ func (a *Auth) AuthMiddleware(next http.Handler) http.Handler {
 func (a *Auth) GenerateJWT(userID uint) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": userID,
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
+		"exp": time.Now().Add(time.Hour * 24).Unix(), // 24 hour expiration
 	})
-	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+
+	return token.SignedString(a.jwtSecret)
 }
 
 func (a *Auth) GenerateRefreshToken() string {

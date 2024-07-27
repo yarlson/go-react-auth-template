@@ -77,11 +77,16 @@ func (r *GormTokenRepository) VerifyRefreshToken(refreshToken string) (uint, err
 	return token.UserID, nil
 }
 
-func (r *GormTokenRepository) UpdateRefreshToken(userID uint, newRefreshToken string) error {
-	return r.db.Model(&RefreshToken{}).
-		Where("user_id = ?", userID).
-		Updates(map[string]interface{}{
-			"token":      newRefreshToken,
-			"expires_at": time.Now().Add(30 * 24 * time.Hour),
-		}).Error
+func (r *GormTokenRepository) UpdateRefreshToken(userID uint, oldRefreshToken, newRefreshToken string) error {
+	err := r.db.Where("token = ?", oldRefreshToken).Delete(&RefreshToken{}).Error
+	if err != nil {
+		return err
+	}
+
+	token := RefreshToken{
+		UserID:    userID,
+		Token:     newRefreshToken,
+		ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
+	}
+	return r.db.Create(&token).Error
 }
