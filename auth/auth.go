@@ -10,8 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"goauth/provider/google"
+	"goauth/provider"
 	"goauth/repository"
+
+	"golang.org/x/oauth2"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
@@ -30,17 +32,23 @@ type TokenRepository interface {
 	UpdateRefreshToken(userID uint, newRefreshToken string) error
 }
 
+type Provider interface {
+	GetAuthURL() string
+	ExchangeCode(code string) (*oauth2.Token, error)
+	GetUserInfo(token *oauth2.Token) (*provider.User, error)
+}
+
 type Auth struct {
 	userRepo           UserRepository
 	tokenRepo          TokenRepository
-	googleAuthProvider *google.AuthProvider
+	googleAuthProvider Provider
 }
 
-func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, googleAuthProvider *google.AuthProvider) *Auth {
+func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, authProvider Provider) *Auth {
 	return &Auth{
 		userRepo:           userRepo,
 		tokenRepo:          tokenRepo,
-		googleAuthProvider: googleAuthProvider,
+		googleAuthProvider: authProvider,
 	}
 }
 

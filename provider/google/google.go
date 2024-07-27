@@ -3,16 +3,11 @@ package google
 import (
 	"context"
 	"encoding/json"
+	"goauth/provider"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
-
-type User struct {
-	Email     string `json:"email"`
-	FirstName string `json:"given_name"`
-	LastName  string `json:"family_name"`
-}
 
 type AuthProvider struct {
 	oauthConfig  *oauth2.Config
@@ -47,7 +42,7 @@ func (g *AuthProvider) ExchangeCode(code string) (*oauth2.Token, error) {
 	return g.oauthConfig.Exchange(context.Background(), code)
 }
 
-func (g *AuthProvider) GetUserInfo(token *oauth2.Token) (*User, error) {
+func (g *AuthProvider) GetUserInfo(token *oauth2.Token) (*provider.User, error) {
 	client := g.oauthConfig.Client(context.Background(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
@@ -55,7 +50,7 @@ func (g *AuthProvider) GetUserInfo(token *oauth2.Token) (*User, error) {
 	}
 	defer resp.Body.Close()
 
-	var userInfo User
+	var userInfo provider.User
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
 		return nil, err
 	}
