@@ -49,13 +49,18 @@ func NewGormTokenRepository(db *gorm.DB) *GormTokenRepository {
 
 func (r *GormUserRepository) GetOrCreateUser(email, firstName, lastName string) (User, error) {
 	var user User
-	result := r.db.Where(User{Email: email}).FirstOrCreate(&user, User{Email: email, FirstName: firstName, LastName: lastName})
-	return user, result.Error
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Where(User{Email: email}).FirstOrCreate(&user, User{Email: email, FirstName: firstName, LastName: lastName})
+		return result.Error
+	})
+
+	return user, err
 }
 
 func (r *GormUserRepository) GetUserByID(id uint) (User, error) {
 	var user User
 	result := r.db.First(&user, id)
+
 	return user, result.Error
 }
 
@@ -65,6 +70,7 @@ func (r *GormTokenRepository) StoreRefreshToken(userID uint, refreshToken string
 		Token:     refreshToken,
 		ExpiresAt: time.Now().Add(30 * 24 * time.Hour), // 30 days expiration
 	}
+
 	return r.db.Create(&token).Error
 }
 
@@ -74,19 +80,22 @@ func (r *GormTokenRepository) VerifyRefreshToken(refreshToken string) (uint, err
 	if result.Error != nil {
 		return 0, result.Error
 	}
+
 	return token.UserID, nil
 }
 
 func (r *GormTokenRepository) UpdateRefreshToken(userID uint, oldRefreshToken, newRefreshToken string) error {
-	err := r.db.Where("token = ?", oldRefreshToken).Delete(&RefreshToken{}).Error
-	if err != nil {
-		return err
-	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("token = ?", oldRefreshToken).Delete(&RefreshToken{}).Error; err != nil {
+			return err
+		}
 
-	token := RefreshToken{
-		UserID:    userID,
-		Token:     newRefreshToken,
-		ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
-	}
-	return r.db.Create(&token).Error
+		token := RefreshToken{
+			UserID:    userID,
+			Token:     newRefreshToken,
+			ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
+		}
+
+		return tx.Create(&token).Error
+	})
 }
