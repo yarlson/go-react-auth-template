@@ -8,6 +8,7 @@ import (
 
 type User struct {
 	gorm.Model
+
 	Email     string `gorm:"uniqueIndex"`
 	FirstName string
 	LastName  string
@@ -15,6 +16,7 @@ type User struct {
 
 type RefreshToken struct {
 	gorm.Model
+
 	UserID    uint
 	Token     string `gorm:"uniqueIndex"`
 	ExpiresAt time.Time

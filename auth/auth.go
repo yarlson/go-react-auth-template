@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"goauth/utils"
 	"net/http"
 	"os"
 	"strings"
@@ -73,7 +74,12 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := a.userRepo.GetOrCreateUser(googleUser.Email, googleUser.FirstName, googleUser.LastName)
+	var user repository.User
+	err = utils.RetryWithBackoff(func() error {
+		var err error
+		user, err = a.userRepo.GetOrCreateUser(googleUser.Email, googleUser.FirstName, googleUser.LastName)
+		return err
+	}, 3)
 	if err != nil {
 		http.Error(w, "Failed to process user: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -128,7 +134,10 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	newRefreshToken := a.GenerateRefreshToken()
 
 	// Update refresh token in database
-	if err := a.tokenRepo.UpdateRefreshToken(userID, request.RefreshToken, newRefreshToken); err != nil {
+	err = utils.RetryWithBackoff(func() error {
+		return a.tokenRepo.UpdateRefreshToken(userID, request.RefreshToken, newRefreshToken)
+	}, 3)
+	if err != nil {
 		http.Error(w, "Failed to update refresh token", http.StatusInternalServerError)
 		return
 	}
