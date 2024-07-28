@@ -86,14 +86,14 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate JWT
-	jwtString, err := a.GenerateJWT(user.ID)
+	jwtString, err := generateJWT(user.ID, a.jwtSecret)
 	if err != nil {
 		http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Generate refresh token
-	refreshToken := a.GenerateRefreshToken()
+	refreshToken := generateRefreshToken()
 
 	// Store refresh token in database
 	if err := a.tokenRepo.StoreRefreshToken(user.ID, refreshToken); err != nil {
@@ -124,14 +124,14 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate new JWT
-	newJWT, err := a.GenerateJWT(userID)
+	newJWT, err := generateJWT(userID, a.jwtSecret)
 	if err != nil {
 		http.Error(w, "Failed to generate JWT", http.StatusInternalServerError)
 		return
 	}
 
 	// Generate new refresh token
-	newRefreshToken := a.GenerateRefreshToken()
+	newRefreshToken := generateRefreshToken()
 
 	// Update refresh token in database
 	err = utils.RetryWithBackoff(func() error {
@@ -159,7 +159,7 @@ func (a *Auth) AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
-		userID, err := a.VerifyJWT(tokenString)
+		userID, err := verifyJWT(tokenString)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
@@ -170,20 +170,20 @@ func (a *Auth) AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (a *Auth) GenerateJWT(userID uint) (string, error) {
+func generateJWT(userID uint, jwtSecret []byte) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": userID,
 		"exp": time.Now().Add(time.Hour * 24).Unix(), // 24 hour expiration
 	})
 
-	return token.SignedString(a.jwtSecret)
+	return token.SignedString(jwtSecret)
 }
 
-func (a *Auth) GenerateRefreshToken() string {
+func generateRefreshToken() string {
 	return uuid.New().String()
 }
 
-func (a *Auth) VerifyJWT(tokenString string) (uint, error) {
+func verifyJWT(tokenString string) (uint, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
