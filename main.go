@@ -35,8 +35,8 @@ func main() {
 	}
 
 	// Initialize repositories
-	userRepo := repository.NewGormUserRepository(db)
-	tokenRepo := repository.NewGormTokenRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	tokenRepo := repository.NewTokenRepository(db)
 
 	// Initialize Google auth provider
 	googleAuthProvider := google.NewAuthProvider(
@@ -78,9 +78,9 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
-func handleUserProfile(userRepo repository.UserRepository) http.HandlerFunc {
+func handleUserProfile(userRepo auth.UserRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value(auth.UserIdContextKey{}).(uint)
+		userID := r.Context().Value(auth.UserIdContextKey{}).(string)
 		user, err := userRepo.GetUserByID(userID)
 		if err != nil {
 			http.Error(w, "User not found", http.StatusNotFound)

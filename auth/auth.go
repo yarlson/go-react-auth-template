@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"goauth/model"
 	"goauth/utils"
 	"net/http"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"goauth/provider"
-	"goauth/repository"
 
 	"golang.org/x/oauth2"
 
@@ -23,14 +23,14 @@ import (
 type UserIdContextKey struct{}
 
 type UserRepository interface {
-	GetOrCreateUser(email string, firstName string, lastName string) (repository.User, error)
-	GetUserByID(id uint) (repository.User, error)
+	GetOrCreateUser(email string, firstName string, lastName string) (model.User, error)
+	GetUserByID(id string) (model.User, error)
 }
 
 type TokenRepository interface {
-	StoreRefreshToken(userID uint, refreshToken string) error
-	VerifyRefreshToken(refreshToken string) (uint, error)
-	UpdateRefreshToken(userID uint, oldRefreshToken, newRefreshToken string) error
+	StoreRefreshToken(userID string, refreshToken string) error
+	VerifyRefreshToken(refreshToken string) (string, error)
+	UpdateRefreshToken(userID string, oldRefreshToken, newRefreshToken string) error
 }
 
 type Provider interface {
@@ -74,7 +74,7 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user repository.User
+	var user model.User
 	err = utils.RetryWithBackoff(func() error {
 		var err error
 		user, err = a.userRepo.GetOrCreateUser(googleUser.Email, googleUser.FirstName, googleUser.LastName)
@@ -170,7 +170,7 @@ func (a *Auth) AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func generateJWT(userID uint, jwtSecret []byte) (string, error) {
+func generateJWT(userID string, jwtSecret []byte) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": userID,
 		"exp": time.Now().Add(time.Hour * 24).Unix(), // 24 hour expiration
@@ -183,7 +183,7 @@ func generateRefreshToken() string {
 	return uuid.New().String()
 }
 
-func verifyJWT(tokenString string) (uint, error) {
+func verifyJWT(tokenString string) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -192,16 +192,16 @@ func verifyJWT(tokenString string) (uint, error) {
 	})
 
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userID, ok := claims["sub"].(float64)
+		userID, ok := claims["sub"].(string)
 		if !ok {
-			return 0, errors.New("invalid user ID in token")
+			return "", errors.New("invalid user ID in token")
 		}
-		return uint(userID), nil
+		return userID, nil
 	}
 
-	return 0, errors.New("invalid token")
+	return "", errors.New("invalid token")
 }
