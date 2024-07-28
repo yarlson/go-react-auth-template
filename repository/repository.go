@@ -1,104 +1,85 @@
 package repository
 
 import (
-	"fmt"
+	"context"
+	"database/sql"
+	"errors"
 	"goauth/model"
 	"time"
 
-	"gorm.io/gorm"
+	"goauth/db"
 )
 
-type User struct {
-	gorm.Model
-
-	Email     string `gorm:"uniqueIndex"`
-	FirstName string
-	LastName  string
-}
-
-type RefreshToken struct {
-	gorm.Model
-
-	UserID    string
-	Token     string `gorm:"uniqueIndex"`
-	ExpiresAt time.Time
-}
-
 type UserRepository struct {
-	db *gorm.DB
+	q db.Querier
 }
 
 type TokenRepository struct {
-	db *gorm.DB
+	q db.Querier
 }
 
-func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(dbConn *sql.DB) *UserRepository {
+	return &UserRepository{q: db.New(dbConn)}
 }
 
-func NewTokenRepository(db *gorm.DB) *TokenRepository {
-	return &TokenRepository{db: db}
+func NewTokenRepository(dbConn *sql.DB) *TokenRepository {
+	return &TokenRepository{q: db.New(dbConn)}
 }
 
-func (r *UserRepository) GetOrCreateUser(email, firstName, lastName string) (model.User, error) {
-	var user User
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		result := tx.Where(User{Email: email}).FirstOrCreate(&user, User{Email: email, FirstName: firstName, LastName: lastName})
-		return result.Error
-	})
+func (r *UserRepository) GetOrCreateUser(ctx context.Context, email, firstName, lastName string) (model.User, error) {
+	user, err := r.q.GetUserByEmail(ctx, email)
+	if errors.Is(err, sql.ErrNoRows) {
+		user, err = r.q.CreateUser(ctx, db.CreateUserParams{
+			Email:     email,
+			FirstName: firstName,
+			LastName:  lastName,
+		})
+	}
 
 	return model.User{
-		ID:        fmt.Sprintf("%d", user.ID),
+		ID:        user.ID,
 		Email:     email,
 		FirstName: firstName,
 		LastName:  lastName,
 	}, err
 }
 
-func (r *UserRepository) GetUserByID(id string) (model.User, error) {
-	var user User
-	result := r.db.First(&user, id)
+func (r *UserRepository) GetUserByID(ctx context.Context, id string) (model.User, error) {
+	user, err := r.q.GetUser(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.User{}, err
+	}
 
 	return model.User{
-		ID:        fmt.Sprintf("%d", user.ID),
+		ID:        user.ID,
 		Email:     user.Email,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
-	}, result.Error
+	}, err
 }
 
-func (r *TokenRepository) StoreRefreshToken(userID string, refreshToken string) error {
-	token := RefreshToken{
+func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID string, refreshToken string) error {
+	_, err := r.q.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
 		UserID:    userID,
 		Token:     refreshToken,
-		ExpiresAt: time.Now().Add(30 * 24 * time.Hour), // 30 days expiration
-	}
-
-	return r.db.Create(&token).Error
+		ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
+	})
+	return err
 }
 
-func (r *TokenRepository) VerifyRefreshToken(refreshToken string) (string, error) {
-	var token RefreshToken
-	result := r.db.Where("token = ? AND expires_at > ?", refreshToken, time.Now()).First(&token)
-	if result.Error != nil {
-		return "", result.Error
+func (r *TokenRepository) VerifyRefreshToken(ctx context.Context, refreshToken string) (string, error) {
+	token, err := r.q.GetRefreshToken(ctx, refreshToken)
+	if err != nil {
+		return "", err
 	}
-
 	return token.UserID, nil
 }
 
-func (r *TokenRepository) UpdateRefreshToken(userID string, oldRefreshToken, newRefreshToken string) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("token = ?", oldRefreshToken).Delete(&RefreshToken{}).Error; err != nil {
-			return err
-		}
-
-		token := RefreshToken{
-			UserID:    userID,
-			Token:     newRefreshToken,
-			ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
-		}
-
-		return tx.Create(&token).Error
+func (r *TokenRepository) UpdateRefreshToken(ctx context.Context, oldRefreshToken, newRefreshToken string) error {
+	_, err := r.q.UpdateRefreshToken(ctx, db.UpdateRefreshTokenParams{
+		Token:     oldRefreshToken,
+		Token_2:   newRefreshToken,
+		ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
 	})
+	return err
 }

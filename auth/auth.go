@@ -23,14 +23,14 @@ import (
 type UserIdContextKey struct{}
 
 type UserRepository interface {
-	GetOrCreateUser(email string, firstName string, lastName string) (model.User, error)
-	GetUserByID(id string) (model.User, error)
+	GetOrCreateUser(ctx context.Context, email, firstName, lastName string) (model.User, error)
+	GetUserByID(ctx context.Context, id string) (model.User, error)
 }
 
 type TokenRepository interface {
-	StoreRefreshToken(userID string, refreshToken string) error
-	VerifyRefreshToken(refreshToken string) (string, error)
-	UpdateRefreshToken(userID string, oldRefreshToken, newRefreshToken string) error
+	StoreRefreshToken(ctx context.Context, userID string, refreshToken string) error
+	VerifyRefreshToken(ctx context.Context, refreshToken string) (string, error)
+	UpdateRefreshToken(ctx context.Context, oldRefreshToken, newRefreshToken string) error
 }
 
 type Provider interface {
@@ -78,7 +78,7 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	var user model.User
 	err = utils.RetryWithBackoff(func() error {
 		var err error
-		user, err = a.userRepo.GetOrCreateUser(googleUser.Email, googleUser.FirstName, googleUser.LastName)
+		user, err = a.userRepo.GetOrCreateUser(r.Context(), googleUser.Email, googleUser.FirstName, googleUser.LastName)
 		return err
 	}, 3)
 	if err != nil {
@@ -97,7 +97,7 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	refreshToken := generateRefreshToken()
 
 	// Store refresh token in database
-	if err := a.tokenRepo.StoreRefreshToken(user.ID, refreshToken); err != nil {
+	if err := a.tokenRepo.StoreRefreshToken(r.Context(), user.ID, refreshToken); err != nil {
 		http.Error(w, "Failed to store refresh token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -118,7 +118,7 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := a.tokenRepo.VerifyRefreshToken(request.RefreshToken)
+	userID, err := a.tokenRepo.VerifyRefreshToken(r.Context(), request.RefreshToken)
 	if err != nil {
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
 		return
@@ -136,7 +136,7 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	// Update refresh token in database
 	err = utils.RetryWithBackoff(func() error {
-		return a.tokenRepo.UpdateRefreshToken(userID, request.RefreshToken, newRefreshToken)
+		return a.tokenRepo.UpdateRefreshToken(r.Context(), request.RefreshToken, newRefreshToken)
 	}, 3)
 	if err != nil {
 		http.Error(w, "Failed to update refresh token", http.StatusInternalServerError)
