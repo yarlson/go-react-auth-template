@@ -45,6 +45,7 @@ func main() {
 		os.Getenv("GOOGLE_HOSTED_DOMAIN"),
 		os.Getenv("GOOGLE_REDIRECT_URL"),
 	)
+	defer googleAuthProvider.Stop()
 
 	// Initialize auth
 	authHandler := auth.NewAuth(userRepo, tokenRepo, googleAuthProvider, os.Getenv("JWT_SECRET"))

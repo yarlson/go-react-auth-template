@@ -35,7 +35,7 @@ type TokenRepository interface {
 
 type Provider interface {
 	GetAuthURL() string
-	ExchangeCode(code string) (*oauth2.Token, error)
+	ExchangeCode(state, code string) (*oauth2.Token, error)
 	GetUserInfo(token *oauth2.Token) (*provider.User, error)
 }
 
@@ -61,8 +61,9 @@ func (a *Auth) HandleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
+	state := r.URL.Query().Get("state")
 	code := r.URL.Query().Get("code")
-	token, err := a.authProvider.ExchangeCode(code)
+	token, err := a.authProvider.ExchangeCode(state, code)
 	if err != nil {
 		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
 		return
