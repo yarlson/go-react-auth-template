@@ -4,8 +4,8 @@ FROM users
 WHERE id = $1 LIMIT 1;
 
 -- name: CreateUser :one
-INSERT INTO users (email, first_name, last_name)
-VALUES ($1, $2, $3) RETURNING *;
+INSERT INTO users (id, email, first_name, last_name)
+VALUES ($1, $2, $3, $4) RETURNING *;
 
 -- name: GetUserByEmail :one
 SELECT *

@@ -4,10 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"goauth/model"
+	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"goauth/db"
+	"goauth/model"
+)
+
+var (
+	ErrUserNotFound = errors.New("user not found")
+	ErrTokenInvalid = errors.New("invalid refresh token")
 )
 
 type UserRepository struct {
@@ -28,50 +36,85 @@ func NewTokenRepository(dbConn *sql.DB) *TokenRepository {
 
 func (r *UserRepository) GetOrCreateUser(ctx context.Context, email, firstName, lastName string) (model.User, error) {
 	user, err := r.q.GetUserByEmail(ctx, email)
-	if errors.Is(err, sql.ErrNoRows) {
-		user, err = r.q.CreateUser(ctx, db.CreateUserParams{
-			Email:     email,
-			FirstName: firstName,
-			LastName:  lastName,
-		})
+	if err == nil {
+		return modelFromDBUser(user), nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return model.User{}, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return model.User{
-		ID:        user.ID,
+	// User doesn't exist, create a new one
+	id, err := uuid.NewV7()
+	if err != nil {
+		return model.User{}, fmt.Errorf("failed to generate UUID: %w", err)
+	}
+
+	newUser, err := r.q.CreateUser(ctx, db.CreateUserParams{
+		ID:        id.String(),
 		Email:     email,
 		FirstName: firstName,
 		LastName:  lastName,
-	}, err
+	})
+	if err != nil {
+		return model.User{}, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	return modelFromDBUser(newUser), nil
 }
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id string) (model.User, error) {
 	user, err := r.q.GetUser(ctx, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return model.User{}, err
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.User{}, ErrUserNotFound
+		}
+		return model.User{}, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return model.User{
-		ID:        user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-	}, err
+	return modelFromDBUser(user), nil
 }
 
-func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID string, refreshToken string) error {
-	_, err := r.q.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
+func modelFromDBUser(dbUser db.User) model.User {
+	return model.User{
+		ID:        dbUser.ID,
+		Email:     dbUser.Email,
+		FirstName: dbUser.FirstName,
+		LastName:  dbUser.LastName,
+	}
+}
+
+func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID, refreshToken string) error {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return fmt.Errorf("failed to generate UUID: %w", err)
+	}
+
+	_, err = r.q.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
+		ID:        id.String(),
 		UserID:    userID,
 		Token:     refreshToken,
 		ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to store refresh token: %w", err)
+	}
+
+	return nil
 }
 
 func (r *TokenRepository) VerifyRefreshToken(ctx context.Context, refreshToken string) (string, error) {
 	token, err := r.q.GetRefreshToken(ctx, refreshToken)
 	if err != nil {
-		return "", err
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrTokenInvalid
+		}
+		return "", fmt.Errorf("failed to verify refresh token: %w", err)
 	}
+
+	if token.ExpiresAt.Before(time.Now()) {
+		return "", ErrTokenInvalid
+	}
+
 	return token.UserID, nil
 }
 
@@ -81,5 +124,12 @@ func (r *TokenRepository) UpdateRefreshToken(ctx context.Context, oldRefreshToke
 		Token_2:   newRefreshToken,
 		ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
 	})
-	return err
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTokenInvalid
+		}
+		return fmt.Errorf("failed to update refresh token: %w", err)
+	}
+
+	return nil
 }
