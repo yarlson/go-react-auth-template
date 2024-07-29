@@ -64,14 +64,15 @@ func (r *UserRepository) GetOrCreateUser(ctx context.Context, email, firstName, 
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id string) (model.User, error) {
 	user, err := r.q.GetUser(ctx, id)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return model.User{}, ErrUserNotFound
-		}
-		return model.User{}, fmt.Errorf("failed to get user: %w", err)
+	if err == nil {
+		return modelFromDBUser(user), nil
 	}
 
-	return modelFromDBUser(user), nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.User{}, ErrUserNotFound
+	}
+
+	return model.User{}, fmt.Errorf("failed to get user: %w", err)
 }
 
 func modelFromDBUser(dbUser db.User) model.User {
@@ -108,6 +109,7 @@ func (r *TokenRepository) VerifyRefreshToken(ctx context.Context, refreshToken s
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", ErrTokenInvalid
 		}
+
 		return "", fmt.Errorf("failed to verify refresh token: %w", err)
 	}
 
