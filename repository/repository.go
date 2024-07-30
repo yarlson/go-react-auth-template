@@ -50,7 +50,7 @@ func (r *UserRepository) GetOrCreateUser(ctx context.Context, email, firstName, 
 	}
 
 	newUser, err := r.q.CreateUser(ctx, db.CreateUserParams{
-		ID:        id.String(),
+		ID:        id,
 		Email:     email,
 		FirstName: firstName,
 		LastName:  lastName,
@@ -63,36 +63,35 @@ func (r *UserRepository) GetOrCreateUser(ctx context.Context, email, firstName, 
 }
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id string) (model.User, error) {
-	user, err := r.q.GetUser(ctx, id)
-	if err == nil {
-		return modelFromDBUser(user), nil
-	}
-
+	user, err := r.q.GetUser(ctx, uuid.MustParse(id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.User{}, ErrUserNotFound
 	}
+	if err != nil {
+		return model.User{}, fmt.Errorf("failed to get user: %w", err)
+	}
 
-	return model.User{}, fmt.Errorf("failed to get user: %w", err)
+	return modelFromDBUser(user), nil
 }
 
 func modelFromDBUser(dbUser db.User) model.User {
 	return model.User{
-		ID:        dbUser.ID,
+		ID:        dbUser.ID.String(),
 		Email:     dbUser.Email,
 		FirstName: dbUser.FirstName,
 		LastName:  dbUser.LastName,
 	}
 }
 
-func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID, refreshToken string) error {
+func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID string, refreshToken string) error {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return fmt.Errorf("failed to generate UUID: %w", err)
 	}
 
 	_, err = r.q.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
-		ID:        id.String(),
-		UserID:    userID,
+		ID:        id,
+		UserID:    uuid.MustParse(userID),
 		Token:     refreshToken,
 		ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
 	})
@@ -105,11 +104,11 @@ func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID, refresh
 
 func (r *TokenRepository) VerifyRefreshToken(ctx context.Context, refreshToken string) (string, error) {
 	token, err := r.q.GetRefreshToken(ctx, refreshToken)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", ErrTokenInvalid
-		}
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrTokenInvalid
+	}
 
+	if err != nil {
 		return "", fmt.Errorf("failed to verify refresh token: %w", err)
 	}
 
@@ -117,7 +116,7 @@ func (r *TokenRepository) VerifyRefreshToken(ctx context.Context, refreshToken s
 		return "", ErrTokenInvalid
 	}
 
-	return token.UserID, nil
+	return token.UserID.String(), nil
 }
 
 func (r *TokenRepository) UpdateRefreshToken(ctx context.Context, oldRefreshToken, newRefreshToken string) error {

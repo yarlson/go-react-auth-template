@@ -8,6 +8,8 @@ package db
 import (
 	"context"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const createRefreshToken = `-- name: CreateRefreshToken :one
@@ -16,8 +18,8 @@ VALUES ($1, $2, $3, $4) RETURNING id, user_id, token, expires_at
 `
 
 type CreateRefreshTokenParams struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expires_at"`
 }

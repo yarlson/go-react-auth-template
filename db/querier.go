@@ -6,6 +6,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type Querier interface {
@@ -13,9 +15,9 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteExpiredTokens(ctx context.Context) error
 	DeleteRefreshToken(ctx context.Context, token string) error
-	DeleteUser(ctx context.Context, id string) error
+	DeleteUser(ctx context.Context, id uuid.UUID) error
 	GetRefreshToken(ctx context.Context, token string) (RefreshToken, error)
-	GetUser(ctx context.Context, id string) (User, error)
+	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateRefreshToken(ctx context.Context, arg UpdateRefreshTokenParams) (RefreshToken, error)
