@@ -63,7 +63,12 @@ func (r *UserRepository) GetOrCreateUser(ctx context.Context, email, firstName, 
 }
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id string) (model.User, error) {
-	user, err := r.q.GetUser(ctx, uuid.MustParse(id))
+	uUserId, err := uuid.Parse(id)
+	if err != nil {
+		return model.User{}, fmt.Errorf("failed to parse UUID: %w", err)
+	}
+
+	user, err := r.q.GetUser(ctx, uUserId)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.User{}, ErrUserNotFound
 	}
@@ -89,9 +94,14 @@ func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID string, 
 		return fmt.Errorf("failed to generate UUID: %w", err)
 	}
 
+	uUserId, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("failed to parse user ID: %w", err)
+	}
+
 	_, err = r.q.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
 		ID:        id,
-		UserID:    uuid.MustParse(userID),
+		UserID:    uUserId,
 		Token:     refreshToken,
 		ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
 	})
