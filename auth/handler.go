@@ -1,10 +1,9 @@
 package auth
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"goauth/model"
+	"goauth/repository"
 	"net/http"
 	"os"
 	"strings"
@@ -17,24 +16,13 @@ import (
 	"github.com/markbates/goth/providers/google"
 )
 
-type UserRepository interface {
-	GetOrCreateUser(ctx context.Context, email, firstName, lastName string) (model.User, error)
-	GetUserByID(ctx context.Context, id uuid.UUID) (model.User, error)
-}
-
-type TokenRepository interface {
-	StoreRefreshToken(ctx context.Context, userID uuid.UUID, refreshToken string) error
-	VerifyRefreshToken(ctx context.Context, refreshToken string) (uuid.UUID, error)
-	UpdateRefreshToken(ctx context.Context, oldRefreshToken, newRefreshToken string) error
-}
-
 type Handler struct {
-	userRepo  UserRepository
-	tokenRepo TokenRepository
+	userRepo  *repository.UserRepository
+	tokenRepo *repository.TokenRepository
 	jwtSecret []byte
 }
 
-func NewHandler(userRepo UserRepository, tokenRepo TokenRepository, jwtSecret string) *Handler {
+func NewHandler(userRepo *repository.UserRepository, tokenRepo *repository.TokenRepository, jwtSecret string) *Handler {
 	goth.UseProviders(
 		google.New(os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"), "http://localhost:5173/callback"),
 	)

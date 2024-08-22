@@ -68,7 +68,7 @@ func main() {
 	log.Fatal(r.Run(":8080"))
 }
 
-func handleUserProfile(userRepo auth.UserRepository) gin.HandlerFunc {
+func handleUserProfile(userRepo *repository.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("userID")
 		if !exists {
