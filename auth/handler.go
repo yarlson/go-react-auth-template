@@ -2,17 +2,20 @@ package auth
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"goauth/model"
-	"goauth/provider"
 	"goauth/utils"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
-	"golang.org/x/oauth2"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/providers/google"
 )
 
 type UserRepository interface {
@@ -26,63 +29,89 @@ type TokenRepository interface {
 	UpdateRefreshToken(ctx context.Context, oldRefreshToken, newRefreshToken string) error
 }
 
-type Provider interface {
-	GetAuthURL() string
-	ExchangeCode(state, code string) (*oauth2.Token, error)
-	GetUserInfo(token *oauth2.Token) (*provider.User, error)
-}
-
 type Handler struct {
-	userRepo     UserRepository
-	tokenRepo    TokenRepository
-	authProvider Provider
-	jwtSecret    []byte
+	userRepo  UserRepository
+	tokenRepo TokenRepository
+	jwtSecret []byte
 }
 
-func NewHandler(userRepo UserRepository, tokenRepo TokenRepository, authProvider Provider, jwtSecret string) *Handler {
+func NewHandler(userRepo UserRepository, tokenRepo TokenRepository, jwtSecret string) *Handler {
+	goth.UseProviders(
+		google.New(os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"), "http://localhost:5173/callback"),
+	)
+
 	return &Handler{
-		userRepo:     userRepo,
-		tokenRepo:    tokenRepo,
-		authProvider: authProvider,
-		jwtSecret:    []byte(jwtSecret),
+		userRepo:  userRepo,
+		tokenRepo: tokenRepo,
+		jwtSecret: []byte(jwtSecret),
 	}
 }
 
 func (h *Handler) HandleLogin(c *gin.Context) {
-	url := h.authProvider.GetAuthURL()
+	provider, err := goth.GetProvider("google")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get provider"})
+		return
+	}
+
+	state := uuid.New().String()
+	sess, err := provider.BeginAuth(state)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to begin authentication"})
+		return
+	}
+
+	url, err := sess.GetAuthURL()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get auth URL"})
+		return
+	}
+
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
 func (h *Handler) HandleCallback(c *gin.Context) {
-	state := c.Query("state")
-	code := c.Query("code")
-	token, err := h.authProvider.ExchangeCode(state, code)
+	provider, err := goth.GetProvider("google")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange token: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get provider"})
 		return
 	}
 
-	googleUser, err := h.authProvider.GetUserInfo(token)
+	state := c.Query("state")
+
+	sess, err := provider.BeginAuth(state)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user info: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to begin authentication"})
+		return
+	}
+
+	_, err = sess.Authorize(provider, c.Request.URL.Query())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to authorize"})
+		return
+	}
+
+	gothUser, err := provider.FetchUser(sess)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user info"})
 		return
 	}
 
 	var user model.User
 	err = utils.RetryWithBackoff(func() error {
 		var err error
-		user, err = h.userRepo.GetOrCreateUser(c, googleUser.Email, googleUser.FirstName, googleUser.LastName)
+		user, err = h.userRepo.GetOrCreateUser(c, gothUser.Email, gothUser.FirstName, gothUser.LastName)
 		return err
 	}, 3)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user"})
 		return
 	}
 
 	// Generate JWT
 	jwtString, err := generateJWT(user.ID, h.jwtSecret)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 
@@ -91,7 +120,7 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 
 	// Store refresh token in database
 	if err := h.tokenRepo.StoreRefreshToken(c, user.ID, refreshToken); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store refresh token: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store refresh token"})
 		return
 	}
 
@@ -141,6 +170,10 @@ func (h *Handler) HandleRefreshToken(c *gin.Context) {
 	})
 }
 
+func (h *Handler) HandleLogout(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
 func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString := c.GetHeader("Authorization")
@@ -179,7 +212,7 @@ func generateRefreshToken() string {
 func verifyJWT(tokenString string, jwtSecret []byte) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, jwt.NewValidationError("unexpected signing method", jwt.ValidationErrorSignatureInvalid)
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return jwtSecret, nil
 	})
@@ -191,10 +224,10 @@ func verifyJWT(tokenString string, jwtSecret []byte) (string, error) {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		userID, ok := claims["sub"].(string)
 		if !ok {
-			return "", jwt.NewValidationError("invalid user ID in token", jwt.ValidationErrorClaimsInvalid)
+			return "", errors.New("invalid user ID in token")
 		}
 		return userID, nil
 	}
 
-	return "", jwt.NewValidationError("invalid token", jwt.ValidationErrorSignatureInvalid)
+	return "", errors.New("invalid token")
 }

@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"goauth/auth"
-	"goauth/provider/google"
 	"goauth/repository"
 
 	"github.com/gin-contrib/cors"
@@ -36,17 +35,8 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewTokenRepository(db)
 
-	// Initialize Google auth provider
-	googleAuthProvider := google.NewAuthProvider(
-		os.Getenv("GOOGLE_CLIENT_ID"),
-		os.Getenv("GOOGLE_CLIENT_SECRET"),
-		os.Getenv("GOOGLE_HOSTED_DOMAIN"),
-		os.Getenv("GOOGLE_REDIRECT_URL"),
-	)
-	defer googleAuthProvider.Stop()
-
-	// Initialize auth
-	authHandler := auth.NewHandler(userRepo, tokenRepo, googleAuthProvider, os.Getenv("JWT_SECRET"))
+	// Initialize auth handler
+	authHandler := auth.NewHandler(userRepo, tokenRepo, os.Getenv("JWT_SECRET"))
 
 	// Set up Gin router
 	r := gin.Default()
@@ -62,6 +52,7 @@ func main() {
 	r.GET("/auth/google", authHandler.HandleLogin)
 	r.GET("/auth/google/callback", authHandler.HandleCallback)
 	r.POST("/auth/refresh", authHandler.HandleRefreshToken)
+	r.GET("/auth/logout", authHandler.HandleLogout)
 
 	// Protected routes
 	authorized := r.Group("/api")
