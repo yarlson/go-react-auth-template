@@ -1,3 +1,5 @@
 main
 .env
-dashboard
+/dashboard/node_modules
+/dashboard/dist
+/dashboard/.env
