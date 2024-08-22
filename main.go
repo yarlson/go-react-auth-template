@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,26 +11,32 @@ import (
 	"goauth/provider/google"
 	"goauth/repository"
 
-	_ "github.com/lib/pq"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
 	_ = godotenv.Load(".env")
 
 	// Initialize database
-	dbConn, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	db, err := gorm.Open(postgres.Open(os.Getenv("DATABASE_URL")), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	// Auto Migrate the schema
+	err = db.AutoMigrate(&repository.User{}, &repository.RefreshToken{})
+	if err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
 	// Initialize repositories
-	userRepo := repository.NewUserRepository(dbConn)
-	tokenRepo := repository.NewTokenRepository(dbConn)
+	userRepo := repository.NewUserRepository(db)
+	tokenRepo := repository.NewTokenRepository(db)
 
 	// Initialize Google auth provider
 	googleAuthProvider := google.NewAuthProvider(
@@ -53,7 +58,7 @@ func main() {
 	corsMiddleware := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-OldToken"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
