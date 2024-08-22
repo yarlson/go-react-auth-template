@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"goauth/model"
-	"goauth/utils"
 	"net/http"
 	"os"
 	"strings"
@@ -97,12 +96,7 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	err = utils.RetryWithBackoff(func() error {
-		var err error
-		user, err = h.userRepo.GetOrCreateUser(c, gothUser.Email, gothUser.FirstName, gothUser.LastName)
-		return err
-	}, 3)
+	user, err := h.userRepo.GetOrCreateUser(c, gothUser.Email, gothUser.FirstName, gothUser.LastName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user"})
 		return
@@ -156,9 +150,7 @@ func (h *Handler) HandleRefreshToken(c *gin.Context) {
 	newRefreshToken := generateRefreshToken()
 
 	// Update refresh token in database
-	err = utils.RetryWithBackoff(func() error {
-		return h.tokenRepo.UpdateRefreshToken(c, request.RefreshToken, newRefreshToken)
-	}, 3)
+	err = h.tokenRepo.UpdateRefreshToken(c, request.RefreshToken, newRefreshToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update refresh token"})
 		return
