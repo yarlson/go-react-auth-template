@@ -19,12 +19,12 @@ import (
 
 type UserRepository interface {
 	GetOrCreateUser(ctx context.Context, email, firstName, lastName string) (model.User, error)
-	GetUserByID(ctx context.Context, id string) (model.User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (model.User, error)
 }
 
 type TokenRepository interface {
-	StoreRefreshToken(ctx context.Context, userID string, refreshToken string) error
-	VerifyRefreshToken(ctx context.Context, refreshToken string) (string, error)
+	StoreRefreshToken(ctx context.Context, userID uuid.UUID, refreshToken string) error
+	VerifyRefreshToken(ctx context.Context, refreshToken string) (uuid.UUID, error)
 	UpdateRefreshToken(ctx context.Context, oldRefreshToken, newRefreshToken string) error
 }
 
@@ -103,7 +103,7 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 	}
 
 	// Generate JWT
-	jwtString, err := generateJWT(user.ID, h.jwtSecret)
+	jwtString, err := generateJWT(user.ID.String(), h.jwtSecret)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -140,7 +140,7 @@ func (h *Handler) HandleRefreshToken(c *gin.Context) {
 	}
 
 	// Generate new JWT
-	newJWT, err := generateJWT(userID, h.jwtSecret)
+	newJWT, err := generateJWT(userID.String(), h.jwtSecret)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate JWT"})
 		return

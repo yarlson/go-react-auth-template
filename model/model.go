@@ -2,10 +2,12 @@ package model
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type User struct {
-	ID string
+	BaseModel
 
 	Email     string
 	FirstName string
@@ -13,7 +15,9 @@ type User struct {
 }
 
 type RefreshToken struct {
-	UserID    uint
+	BaseModel
+
+	UserID    uuid.UUID
 	Token     string
 	ExpiresAt time.Time
 }

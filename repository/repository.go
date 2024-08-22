@@ -2,28 +2,13 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"goauth/model"
 	"time"
 
+	"github.com/google/uuid"
+
 	"gorm.io/gorm"
 )
-
-type User struct {
-	gorm.Model
-
-	Email     string `gorm:"uniqueIndex"`
-	FirstName string
-	LastName  string
-}
-
-type RefreshToken struct {
-	gorm.Model
-
-	UserID    string
-	Token     string `gorm:"uniqueIndex"`
-	ExpiresAt time.Time
-}
 
 type UserRepository struct {
 	db *gorm.DB
@@ -42,34 +27,24 @@ func NewTokenRepository(db *gorm.DB) *TokenRepository {
 }
 
 func (r *UserRepository) GetOrCreateUser(ctx context.Context, email, firstName, lastName string) (model.User, error) {
-	var user User
+	var user model.User
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		result := tx.Where(User{Email: email}).FirstOrCreate(&user, User{Email: email, FirstName: firstName, LastName: lastName})
+		result := tx.Where(model.User{Email: email}).FirstOrCreate(&user, model.User{Email: email, FirstName: firstName, LastName: lastName})
 		return result.Error
 	})
 
-	return model.User{
-		ID:        fmt.Sprintf("%d", user.ID),
-		Email:     email,
-		FirstName: firstName,
-		LastName:  lastName,
-	}, err
+	return user, err
 }
 
-func (r *UserRepository) GetUserByID(ctx context.Context, id string) (model.User, error) {
-	var user User
+func (r *UserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (model.User, error) {
+	var user model.User
 	result := r.db.First(&user, id)
 
-	return model.User{
-		ID:        fmt.Sprintf("%d", user.ID),
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-	}, result.Error
+	return user, result.Error
 }
 
-func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID string, refreshToken string) error {
-	token := RefreshToken{
+func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID uuid.UUID, refreshToken string) error {
+	token := model.RefreshToken{
 		UserID:    userID,
 		Token:     refreshToken,
 		ExpiresAt: time.Now().Add(30 * 24 * time.Hour), // 30 days expiration
@@ -78,11 +53,11 @@ func (r *TokenRepository) StoreRefreshToken(ctx context.Context, userID string, 
 	return r.db.Create(&token).Error
 }
 
-func (r *TokenRepository) VerifyRefreshToken(ctx context.Context, refreshToken string) (string, error) {
-	var token RefreshToken
+func (r *TokenRepository) VerifyRefreshToken(ctx context.Context, refreshToken string) (uuid.UUID, error) {
+	var token model.RefreshToken
 	result := r.db.Where("token = ? AND expires_at > ?", refreshToken, time.Now()).First(&token)
 	if result.Error != nil {
-		return "", result.Error
+		return uuid.Nil, result.Error
 	}
 
 	return token.UserID, nil
@@ -90,11 +65,11 @@ func (r *TokenRepository) VerifyRefreshToken(ctx context.Context, refreshToken s
 
 func (r *TokenRepository) UpdateRefreshToken(ctx context.Context, oldRefreshToken, newRefreshToken string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("token = ?", oldRefreshToken).Delete(&RefreshToken{}).Error; err != nil {
+		if err := tx.Where("token = ?", oldRefreshToken).Delete(&model.RefreshToken{}).Error; err != nil {
 			return err
 		}
 
-		token := RefreshToken{
+		token := model.RefreshToken{
 			Token:     newRefreshToken,
 			ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
 		}

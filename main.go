@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"goauth/model"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/google/uuid"
 
 	"goauth/auth"
 	"goauth/repository"
@@ -26,7 +29,7 @@ func main() {
 	}
 
 	// Auto Migrate the schema
-	err = db.AutoMigrate(&repository.User{}, &repository.RefreshToken{})
+	err = db.AutoMigrate(&model.User{}, &model.RefreshToken{})
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -73,7 +76,7 @@ func handleUserProfile(userRepo auth.UserRepository) gin.HandlerFunc {
 			return
 		}
 
-		user, err := userRepo.GetUserByID(c, userID.(string))
+		user, err := userRepo.GetUserByID(c, uuid.MustParse(userID.(string)))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return

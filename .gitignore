@@ -3,4 +3,5 @@ main
 /dashboard/node_modules
 /dashboard/dist
 /dashboard/.env
+/dashboard/.vite
 .idea
