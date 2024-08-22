@@ -48,7 +48,7 @@ func main() {
 	defer googleAuthProvider.Stop()
 
 	// Initialize auth
-	authHandler := auth.NewAuth(userRepo, tokenRepo, googleAuthProvider, os.Getenv("JWT_SECRET"))
+	authHandler := auth.NewHandler(userRepo, tokenRepo, googleAuthProvider, os.Getenv("JWT_SECRET"))
 
 	// Set up chi router
 	r := chi.NewRouter()

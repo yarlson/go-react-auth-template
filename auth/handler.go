@@ -39,15 +39,15 @@ type Provider interface {
 	GetUserInfo(token *oauth2.Token) (*provider.User, error)
 }
 
-type Auth struct {
+type Handler struct {
 	userRepo     UserRepository
 	tokenRepo    TokenRepository
 	authProvider Provider
 	jwtSecret    []byte
 }
 
-func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, authProvider Provider, jwtSecret string) *Auth {
-	return &Auth{
+func NewHandler(userRepo UserRepository, tokenRepo TokenRepository, authProvider Provider, jwtSecret string) *Handler {
+	return &Handler{
 		userRepo:     userRepo,
 		tokenRepo:    tokenRepo,
 		authProvider: authProvider,
@@ -55,21 +55,21 @@ func NewAuth(userRepo UserRepository, tokenRepo TokenRepository, authProvider Pr
 	}
 }
 
-func (a *Auth) HandleLogin(w http.ResponseWriter, r *http.Request) {
-	url := a.authProvider.GetAuthURL()
+func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	url := h.authProvider.GetAuthURL()
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	state := r.URL.Query().Get("state")
 	code := r.URL.Query().Get("code")
-	token, err := a.authProvider.ExchangeCode(state, code)
+	token, err := h.authProvider.ExchangeCode(state, code)
 	if err != nil {
 		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	googleUser, err := a.authProvider.GetUserInfo(token)
+	googleUser, err := h.authProvider.GetUserInfo(token)
 	if err != nil {
 		http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -78,7 +78,7 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	var user model.User
 	err = utils.RetryWithBackoff(func() error {
 		var err error
-		user, err = a.userRepo.GetOrCreateUser(r.Context(), googleUser.Email, googleUser.FirstName, googleUser.LastName)
+		user, err = h.userRepo.GetOrCreateUser(r.Context(), googleUser.Email, googleUser.FirstName, googleUser.LastName)
 		return err
 	}, 3)
 	if err != nil {
@@ -87,7 +87,7 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate JWT
-	jwtString, err := generateJWT(user.ID, a.jwtSecret)
+	jwtString, err := generateJWT(user.ID, h.jwtSecret)
 	if err != nil {
 		http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -97,7 +97,7 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	refreshToken := generateRefreshToken()
 
 	// Store refresh token in database
-	if err := a.tokenRepo.StoreRefreshToken(r.Context(), user.ID, refreshToken); err != nil {
+	if err := h.tokenRepo.StoreRefreshToken(r.Context(), user.ID, refreshToken); err != nil {
 		http.Error(w, "Failed to store refresh token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -109,7 +109,7 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		RefreshToken string `json:"refreshToken"`
 	}
@@ -118,14 +118,14 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := a.tokenRepo.VerifyRefreshToken(r.Context(), request.RefreshToken)
+	userID, err := h.tokenRepo.VerifyRefreshToken(r.Context(), request.RefreshToken)
 	if err != nil {
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
 		return
 	}
 
 	// Generate new JWT
-	newJWT, err := generateJWT(userID, a.jwtSecret)
+	newJWT, err := generateJWT(userID, h.jwtSecret)
 	if err != nil {
 		http.Error(w, "Failed to generate JWT", http.StatusInternalServerError)
 		return
@@ -136,7 +136,7 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	// Update refresh token in database
 	err = utils.RetryWithBackoff(func() error {
-		return a.tokenRepo.UpdateRefreshToken(r.Context(), request.RefreshToken, newRefreshToken)
+		return h.tokenRepo.UpdateRefreshToken(r.Context(), request.RefreshToken, newRefreshToken)
 	}, 3)
 	if err != nil {
 		http.Error(w, "Failed to update refresh token", http.StatusInternalServerError)
@@ -151,7 +151,7 @@ func (a *Auth) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (a *Auth) AuthMiddleware(next http.Handler) http.Handler {
+func (h *Handler) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenString := r.Header.Get("Authorization")
 		if tokenString == "" {
