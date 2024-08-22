@@ -2,23 +2,18 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"goauth/model"
+	"goauth/provider"
 	"goauth/utils"
 	"net/http"
 	"strings"
 	"time"
 
-	"goauth/provider"
-
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
-
-type UserIdContextKey struct{}
 
 type UserRepository interface {
 	GetOrCreateUser(ctx context.Context, email, firstName, lastName string) (model.User, error)
@@ -53,41 +48,41 @@ func NewHandler(userRepo UserRepository, tokenRepo TokenRepository, authProvider
 	}
 }
 
-func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleLogin(c *gin.Context) {
 	url := h.authProvider.GetAuthURL()
-	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
-func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
-	state := r.URL.Query().Get("state")
-	code := r.URL.Query().Get("code")
+func (h *Handler) HandleCallback(c *gin.Context) {
+	state := c.Query("state")
+	code := c.Query("code")
 	token, err := h.authProvider.ExchangeCode(state, code)
 	if err != nil {
-		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange token: " + err.Error()})
 		return
 	}
 
 	googleUser, err := h.authProvider.GetUserInfo(token)
 	if err != nil {
-		http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user info: " + err.Error()})
 		return
 	}
 
 	var user model.User
 	err = utils.RetryWithBackoff(func() error {
 		var err error
-		user, err = h.userRepo.GetOrCreateUser(r.Context(), googleUser.Email, googleUser.FirstName, googleUser.LastName)
+		user, err = h.userRepo.GetOrCreateUser(c, googleUser.Email, googleUser.FirstName, googleUser.LastName)
 		return err
 	}, 3)
 	if err != nil {
-		http.Error(w, "Failed to process user: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user: " + err.Error()})
 		return
 	}
 
 	// Generate JWT
 	jwtString, err := generateJWT(user.ID, h.jwtSecret)
 	if err != nil {
-		http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token: " + err.Error()})
 		return
 	}
 
@@ -95,37 +90,36 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	refreshToken := generateRefreshToken()
 
 	// Store refresh token in database
-	if err := h.tokenRepo.StoreRefreshToken(r.Context(), user.ID, refreshToken); err != nil {
-		http.Error(w, "Failed to store refresh token: "+err.Error(), http.StatusInternalServerError)
+	if err := h.tokenRepo.StoreRefreshToken(c, user.ID, refreshToken); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store refresh token: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	c.JSON(http.StatusOK, gin.H{
 		"token":        jwtString,
 		"refreshToken": refreshToken,
 	})
 }
 
-func (h *Handler) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleRefreshToken(c *gin.Context) {
 	var request struct {
 		RefreshToken string `json:"refreshToken"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	userID, err := h.tokenRepo.VerifyRefreshToken(r.Context(), request.RefreshToken)
+	userID, err := h.tokenRepo.VerifyRefreshToken(c, request.RefreshToken)
 	if err != nil {
-		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
 	}
 
 	// Generate new JWT
 	newJWT, err := generateJWT(userID, h.jwtSecret)
 	if err != nil {
-		http.Error(w, "Failed to generate JWT", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate JWT"})
 		return
 	}
 
@@ -134,39 +128,39 @@ func (h *Handler) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	// Update refresh token in database
 	err = utils.RetryWithBackoff(func() error {
-		return h.tokenRepo.UpdateRefreshToken(r.Context(), request.RefreshToken, newRefreshToken)
+		return h.tokenRepo.UpdateRefreshToken(c, request.RefreshToken, newRefreshToken)
 	}, 3)
 	if err != nil {
-		http.Error(w, "Failed to update refresh token", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update refresh token"})
 		return
 	}
 
-	// Send both new tokens back to the client
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	c.JSON(http.StatusOK, gin.H{
 		"token":        newJWT,
 		"refreshToken": newRefreshToken,
 	})
 }
 
-func (h *Handler) AuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenString := r.Header.Get("Authorization")
+func (h *Handler) AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString := c.GetHeader("Authorization")
 		if tokenString == "" {
-			http.Error(w, "Missing authorization header", http.StatusUnauthorized)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization header"})
+			c.Abort()
 			return
 		}
 
 		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 		userID, err := verifyJWT(tokenString, h.jwtSecret)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.Abort()
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), UserIdContextKey{}, userID)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+		c.Set("userID", userID)
+		c.Next()
+	}
 }
 
 func generateJWT(userID string, jwtSecret []byte) (string, error) {
@@ -185,7 +179,7 @@ func generateRefreshToken() string {
 func verifyJWT(tokenString string, jwtSecret []byte) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			return nil, jwt.NewValidationError("unexpected signing method", jwt.ValidationErrorSignatureInvalid)
 		}
 		return jwtSecret, nil
 	})
@@ -197,10 +191,10 @@ func verifyJWT(tokenString string, jwtSecret []byte) (string, error) {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		userID, ok := claims["sub"].(string)
 		if !ok {
-			return "", errors.New("invalid user ID in token")
+			return "", jwt.NewValidationError("invalid user ID in token", jwt.ValidationErrorClaimsInvalid)
 		}
 		return userID, nil
 	}
 
-	return "", errors.New("invalid token")
+	return "", jwt.NewValidationError("invalid token", jwt.ValidationErrorSignatureInvalid)
 }

@@ -59,18 +59,13 @@ func main() {
 	r.Use(cors.New(config))
 
 	// Auth routes
-	r.GET("/auth/google", gin.WrapF(authHandler.HandleLogin))
-	r.GET("/auth/google/callback", gin.WrapF(authHandler.HandleCallback))
-	r.POST("/auth/refresh", gin.WrapF(authHandler.HandleRefreshToken))
+	r.GET("/auth/google", authHandler.HandleLogin)
+	r.GET("/auth/google/callback", authHandler.HandleCallback)
+	r.POST("/auth/refresh", authHandler.HandleRefreshToken)
 
 	// Protected routes
 	authorized := r.Group("/api")
-	authorized.Use(func(c *gin.Context) {
-		authHandler.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			c.Request = r
-			c.Next()
-		})).ServeHTTP(c.Writer, c.Request)
-	})
+	authorized.Use(authHandler.AuthMiddleware())
 	{
 		authorized.GET("/user/profile", handleUserProfile(userRepo))
 	}
@@ -81,12 +76,13 @@ func main() {
 
 func handleUserProfile(userRepo auth.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, ok := c.Value("userId").(string)
-		if !ok {
+		userID, exists := c.Get("userID")
+		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
 		}
 
-		user, err := userRepo.GetUserByID(c.Request.Context(), userID)
+		user, err := userRepo.GetUserByID(c, userID.(string))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return
