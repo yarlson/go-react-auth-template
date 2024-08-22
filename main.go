@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,10 +10,9 @@ import (
 	"goauth/provider/google"
 	"goauth/repository"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/rs/cors"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -50,46 +48,51 @@ func main() {
 	// Initialize auth
 	authHandler := auth.NewHandler(userRepo, tokenRepo, googleAuthProvider, os.Getenv("JWT_SECRET"))
 
-	// Set up chi router
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	// Set up Gin router
+	r := gin.Default()
 
-	corsMiddleware := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
+	// Configure CORS
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	config.AllowCredentials = true
+	config.AddAllowHeaders("Authorization")
+	r.Use(cors.New(config))
+
+	// Auth routes
+	r.GET("/auth/google", gin.WrapF(authHandler.HandleLogin))
+	r.GET("/auth/google/callback", gin.WrapF(authHandler.HandleCallback))
+	r.POST("/auth/refresh", gin.WrapF(authHandler.HandleRefreshToken))
+
+	// Protected routes
+	authorized := r.Group("/api")
+	authorized.Use(func(c *gin.Context) {
+		authHandler.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			c.Request = r
+			c.Next()
+		})).ServeHTTP(c.Writer, c.Request)
 	})
-	r.Use(corsMiddleware.Handler)
-
-	r.Get("/auth/google", authHandler.HandleLogin)
-	r.Get("/auth/google/callback", authHandler.HandleCallback)
-
-	r.Post("/auth/refresh", authHandler.HandleRefreshToken)
-
-	r.Group(func(r chi.Router) {
-		r.Use(authHandler.AuthMiddleware)
-		r.Get("/api/user/profile", handleUserProfile(userRepo))
-	})
+	{
+		authorized.GET("/user/profile", handleUserProfile(userRepo))
+	}
 
 	fmt.Println("Server is running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(r.Run(":8080"))
 }
 
-func handleUserProfile(userRepo auth.UserRepository) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value(auth.UserIdContextKey{}).(string)
-		user, err := userRepo.GetUserByID(r.Context(), userID)
+func handleUserProfile(userRepo auth.UserRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := c.Value("userId").(string)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		}
+
+		user, err := userRepo.GetUserByID(c.Request.Context(), userID)
 		if err != nil {
-			http.Error(w, "User not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		c.JSON(http.StatusOK, gin.H{
 			"id":        user.ID,
 			"email":     user.Email,
 			"firstName": user.FirstName,

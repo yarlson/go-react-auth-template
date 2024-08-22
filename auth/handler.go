@@ -8,16 +8,14 @@ import (
 	"goauth/model"
 	"goauth/utils"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"goauth/provider"
 
-	"golang.org/x/oauth2"
-
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
+	"golang.org/x/oauth2"
 )
 
 type UserIdContextKey struct{}
@@ -143,7 +141,7 @@ func (h *Handler) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Send both new tokens back to the client
+	// Send both new tokens back to the client
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"token":        newJWT,
@@ -160,7 +158,7 @@ func (h *Handler) AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
-		userID, err := verifyJWT(tokenString)
+		userID, err := verifyJWT(tokenString, h.jwtSecret)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
@@ -184,12 +182,12 @@ func generateRefreshToken() string {
 	return uuid.New().String()
 }
 
-func verifyJWT(tokenString string) (string, error) {
+func verifyJWT(tokenString string, jwtSecret []byte) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(os.Getenv("JWT_SECRET")), nil
+		return jwtSecret, nil
 	})
 
 	if err != nil {
