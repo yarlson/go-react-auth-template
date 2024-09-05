@@ -9,6 +9,7 @@ export const api: Wretch = wretch(BASE_URL)
       try {
         return await next(url, opts);
       } catch (error) {
+        console.log("Error:", error);
         if (
           error instanceof Error &&
           "status" in error &&
@@ -31,13 +32,6 @@ export const api: Wretch = wretch(BASE_URL)
       }
     },
   ]);
-
-// Type the specific API calls
-export const apiCalls = {
-  getUserInfo: () =>
-    api.url("/api/user/profile").get().json<UserInfoResponse>(),
-  refreshToken: () => api.url("/auth/refresh").post().json<void>(),
-};
 
 // Define the response types
 export interface UserInfoResponse {

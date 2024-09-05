@@ -110,6 +110,7 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 
 	user, err := h.userRepo.GetOrCreateUser(c, gothUser.Email, gothUser.FirstName, gothUser.LastName, gothUser.AvatarURL)
 	if err != nil {
+		fmt.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user"})
 		return
 	}
@@ -131,7 +132,7 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 	}
 
 	// Encode session data
-	encoded, err := h.secureCookie.Encode("session", string(jsonData))
+	encodedSession, err := h.secureCookie.Encode("session", string(jsonData))
 	if err != nil {
 		fmt.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode session data"})
@@ -147,11 +148,17 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 		return
 	}
 
+	encodedRefreshToken, err := h.secureCookie.Encode("refresh", refreshToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode refresh token"})
+		return
+	}
+
 	// Set session cookie
-	c.SetCookie("session", encoded, 3600, "/", "", true, true) // 1 hour expiration, secure, HTTP-only
+	c.SetCookie("session", encodedSession, 60, "/", "", true, true) // 1 hour expiration, secure, HTTP-only
 
 	// Set refresh cookie
-	c.SetCookie("refresh", refreshToken, 30*24*3600, "/", "", true, true) // 30 days expiration, secure, HTTP-only
+	c.SetCookie("refresh", encodedRefreshToken, 30*24*3600, "/", "", true, true) // 30 days expiration, secure, HTTP-only
 
 	c.JSON(http.StatusOK, gin.H{"message": "Authentication successful"})
 }
@@ -163,7 +170,13 @@ func (h *Handler) HandleRefresh(c *gin.Context) {
 		return
 	}
 
-	userID, err := h.tokenRepo.VerifyRefreshToken(c, refreshToken)
+	var decodedRefreshToken string
+	if err := h.secureCookie.Decode("refresh", refreshToken, &decodedRefreshToken); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+
+	userID, err := h.tokenRepo.VerifyRefreshToken(c, decodedRefreshToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
@@ -192,7 +205,7 @@ func (h *Handler) HandleRefresh(c *gin.Context) {
 	}
 
 	// Encode new session data
-	encoded, err := h.secureCookie.Encode("session", string(jsonData))
+	encodedSession, err := h.secureCookie.Encode("session", string(jsonData))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode session data"})
 		return
@@ -208,11 +221,17 @@ func (h *Handler) HandleRefresh(c *gin.Context) {
 		return
 	}
 
+	encodedRefreshToken, err := h.secureCookie.Encode("refresh", refreshToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode refresh token"})
+		return
+	}
+
 	// Set new session cookie
-	c.SetCookie("session", encoded, 3600, "/", "", true, true) // 1 hour expiration, secure, HTTP-only
+	c.SetCookie("session", encodedSession, 3600, "/", "", true, true) // 1 hour expiration, secure, HTTP-only
 
 	// Set new refresh cookie
-	c.SetCookie("refresh", newRefreshToken, 30*24*3600, "/", "", true, true) // 30 days expiration, secure, HTTP-only
+	c.SetCookie("refresh", encodedRefreshToken, 30*24*3600, "/", "", true, true) // 30 days expiration, secure, HTTP-only
 
 	c.JSON(http.StatusOK, gin.H{"message": "Tokens refreshed successfully"})
 }
