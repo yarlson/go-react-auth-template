@@ -153,7 +153,7 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode refresh token"})
 		return
 	}
-
+	c.SetSameSite(http.SameSiteStrictMode)
 	// Set session cookie
 	c.SetCookie("session", encodedSession, 60, "/", "", true, true) // 1 hour expiration, secure, HTTP-only
 
