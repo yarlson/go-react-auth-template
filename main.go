@@ -27,7 +27,7 @@ func main() {
 	}
 
 	// Auto Migrate the schema
-	err = db.AutoMigrate(&model.User{}, &model.RefreshToken{}, &model.SessionToken{})
+	err = db.AutoMigrate(&model.User{}, &model.RefreshToken{})
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -37,7 +37,10 @@ func main() {
 	tokenRepo := repository.NewTokenRepository(db)
 
 	// Initialize auth handler
-	authHandler := auth.NewHandler(userRepo, tokenRepo)
+	authHandler, err := auth.NewHandler(userRepo, tokenRepo)
+	if err != nil {
+		log.Fatalf("Failed to initialize auth handler: %v", err)
+	}
 
 	// Set up Gin router
 	r := gin.Default()
@@ -58,39 +61,21 @@ func main() {
 	authorized := r.Group("/api")
 	authorized.Use(authHandler.AuthMiddleware())
 	{
-		authorized.GET("/user/profile", handleUserProfile(userRepo, tokenRepo))
+		authorized.GET("/user/profile", handleUserProfile())
 	}
 
 	fmt.Println("Server is running on http://localhost:8080")
 	log.Fatal(r.Run(":8080"))
 }
 
-func handleUserProfile(userRepo *repository.UserRepository, tokenRepo *repository.TokenRepository) gin.HandlerFunc {
+func handleUserProfile() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		sessionToken, err := c.Cookie("session")
-		if err != nil {
+		user, exists := c.Get("user")
+		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 
-		// Retrieve the user ID associated with the session token
-		userID, err := tokenRepo.GetUserIDFromSessionToken(c, sessionToken)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid session"})
-			return
-		}
-
-		user, err := userRepo.GetUserByID(c, userID)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"id":        user.ID,
-			"email":     user.Email,
-			"firstName": user.FirstName,
-			"lastName":  user.LastName,
-		})
+		c.JSON(http.StatusOK, user)
 	}
 }

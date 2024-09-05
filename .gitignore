@@ -4,4 +4,4 @@ main
 /dashboard/dist
 /dashboard/.env
 /dashboard/.vite
-.idea
+.DS_Store
