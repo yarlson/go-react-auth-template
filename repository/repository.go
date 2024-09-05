@@ -65,15 +65,42 @@ func (r *TokenRepository) VerifyRefreshToken(ctx context.Context, refreshToken s
 
 func (r *TokenRepository) UpdateRefreshToken(ctx context.Context, oldRefreshToken, newRefreshToken string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("token = ?", oldRefreshToken).Delete(&model.RefreshToken{}).Error; err != nil {
+		var token model.RefreshToken
+		if err := tx.Where("token = ?", oldRefreshToken).First(&token).Error; err != nil {
 			return err
 		}
 
-		token := model.RefreshToken{
-			Token:     newRefreshToken,
-			ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
-		}
+		token.Token = newRefreshToken
+		token.ExpiresAt = time.Now().Add(30 * 24 * time.Hour)
 
-		return tx.Create(&token).Error
+		return tx.Save(&token).Error
 	})
+}
+
+func (r *TokenRepository) InvalidateRefreshToken(ctx context.Context, refreshToken string) error {
+	return r.db.Where("token = ?", refreshToken).Delete(&model.RefreshToken{}).Error
+}
+
+func (r *TokenRepository) GetUserIDFromSessionToken(ctx context.Context, sessionToken string) (uuid.UUID, error) {
+	var token model.SessionToken
+	result := r.db.Where("token = ? AND expires_at > ?", sessionToken, time.Now()).First(&token)
+	if result.Error != nil {
+		return uuid.Nil, result.Error
+	}
+
+	return token.UserID, nil
+}
+
+func (r *TokenRepository) StoreSessionToken(ctx context.Context, userID uuid.UUID, sessionToken string) error {
+	token := model.SessionToken{
+		UserID:    userID,
+		Token:     sessionToken,
+		ExpiresAt: time.Now().Add(1 * time.Hour), // 1 hour expiration
+	}
+
+	return r.db.Create(&token).Error
+}
+
+func (r *TokenRepository) InvalidateSessionToken(ctx context.Context, sessionToken string) error {
+	return r.db.Where("token = ?", sessionToken).Delete(&model.SessionToken{}).Error
 }

@@ -1,16 +1,11 @@
 package auth
 
 import (
-	"errors"
-	"fmt"
 	"goauth/repository"
 	"net/http"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/providers/google"
@@ -19,10 +14,9 @@ import (
 type Handler struct {
 	userRepo  *repository.UserRepository
 	tokenRepo *repository.TokenRepository
-	jwtSecret []byte
 }
 
-func NewHandler(userRepo *repository.UserRepository, tokenRepo *repository.TokenRepository, jwtSecret string) *Handler {
+func NewHandler(userRepo *repository.UserRepository, tokenRepo *repository.TokenRepository) *Handler {
 	goth.UseProviders(
 		google.New(os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"), "http://localhost:5173/callback"),
 	)
@@ -30,7 +24,6 @@ func NewHandler(userRepo *repository.UserRepository, tokenRepo *repository.Token
 	return &Handler{
 		userRepo:  userRepo,
 		tokenRepo: tokenRepo,
-		jwtSecret: []byte(jwtSecret),
 	}
 }
 
@@ -90,15 +83,17 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 		return
 	}
 
-	// Generate JWT
-	jwtString, err := generateJWT(user.ID.String(), h.jwtSecret)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+	// Generate session token
+	sessionToken := generateToken()
+
+	// Store session token in database
+	if err := h.tokenRepo.StoreSessionToken(c, user.ID, sessionToken); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store session token"})
 		return
 	}
 
 	// Generate refresh token
-	refreshToken := generateRefreshToken()
+	refreshToken := generateToken()
 
 	// Store refresh token in database
 	if err := h.tokenRepo.StoreRefreshToken(c, user.ID, refreshToken); err != nil {
@@ -106,108 +101,97 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token":        jwtString,
-		"refreshToken": refreshToken,
-	})
+	// Set session cookie
+	c.SetCookie("session", sessionToken, 3600, "/", "", false, false) // 1 hour expiration, not HTTP-only
+
+	// Set refresh cookie
+	c.SetCookie("refresh", refreshToken, 30*24*3600, "/", "", false, true) // 30 days expiration, HTTP-only
+
+	c.JSON(http.StatusOK, gin.H{"message": "Authentication successful"})
 }
 
-func (h *Handler) HandleRefreshToken(c *gin.Context) {
-	var request struct {
-		RefreshToken string `json:"refreshToken"`
-	}
-	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+func (h *Handler) HandleRefresh(c *gin.Context) {
+	refreshToken, err := c.Cookie("refresh")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No refresh token provided"})
 		return
 	}
 
-	userID, err := h.tokenRepo.VerifyRefreshToken(c, request.RefreshToken)
+	userID, err := h.tokenRepo.VerifyRefreshToken(c, refreshToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
 	}
 
-	// Generate new JWT
-	newJWT, err := generateJWT(userID.String(), h.jwtSecret)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate JWT"})
+	// Generate new session token
+	newSessionToken := generateToken()
+
+	// Store new session token in database
+	if err := h.tokenRepo.StoreSessionToken(c, userID, newSessionToken); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store session token"})
 		return
 	}
 
 	// Generate new refresh token
-	newRefreshToken := generateRefreshToken()
+	newRefreshToken := generateToken()
 
 	// Update refresh token in database
-	err = h.tokenRepo.UpdateRefreshToken(c, request.RefreshToken, newRefreshToken)
+	err = h.tokenRepo.UpdateRefreshToken(c, refreshToken, newRefreshToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update refresh token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token":        newJWT,
-		"refreshToken": newRefreshToken,
-	})
+	// Set new session cookie
+	c.SetCookie("session", newSessionToken, 3600, "/", "", false, false) // 1 hour expiration, not HTTP-only
+
+	// Set new refresh cookie
+	c.SetCookie("refresh", newRefreshToken, 30*24*3600, "/", "", false, true) // 30 days expiration, HTTP-only
+
+	c.JSON(http.StatusOK, gin.H{"message": "Tokens refreshed successfully"})
 }
 
 func (h *Handler) HandleLogout(c *gin.Context) {
+	sessionToken, _ := c.Cookie("session")
+	if sessionToken != "" {
+		_ = h.tokenRepo.InvalidateSessionToken(c, sessionToken)
+	}
+
+	refreshToken, _ := c.Cookie("refresh")
+	if refreshToken != "" {
+		_ = h.tokenRepo.InvalidateRefreshToken(c, refreshToken)
+	}
+
+	// Clear session cookie
+	c.SetCookie("session", "", -1, "/", "", false, false)
+
+	// Clear refresh cookie
+	c.SetCookie("refresh", "", -1, "/", "", false, true)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
 func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenString := c.GetHeader("Authorization")
-		if tokenString == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization header"})
+		sessionToken, err := c.Cookie("session")
+		if err != nil || sessionToken == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "No session token provided"})
 			c.Abort()
 			return
 		}
 
-		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
-		userID, err := verifyJWT(tokenString, h.jwtSecret)
+		// Verify the session token
+		_, err = h.tokenRepo.GetUserIDFromSessionToken(c, sessionToken)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid session"})
 			c.Abort()
 			return
 		}
 
-		c.Set("userID", userID)
 		c.Next()
 	}
 }
 
-func generateJWT(userID string, jwtSecret []byte) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": userID,
-		"exp": time.Now().Add(time.Hour * 24).Unix(), // 24 hour expiration
-	})
-
-	return token.SignedString(jwtSecret)
-}
-
-func generateRefreshToken() string {
+func generateToken() string {
 	return uuid.New().String()
-}
-
-func verifyJWT(tokenString string, jwtSecret []byte) (string, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return jwtSecret, nil
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userID, ok := claims["sub"].(string)
-		if !ok {
-			return "", errors.New("invalid user ID in token")
-		}
-		return userID, nil
-	}
-
-	return "", errors.New("invalid token")
 }
