@@ -178,7 +178,7 @@ func (h *Handler) HandleRefresh(c *gin.Context) {
 
 	userID, err := h.tokenRepo.VerifyRefreshToken(c, decodedRefreshToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired refresh token"})
 		return
 	}
 
@@ -215,20 +215,20 @@ func (h *Handler) HandleRefresh(c *gin.Context) {
 	newRefreshToken := uuid.New().String()
 
 	// Update refresh token in database
-	err = h.tokenRepo.UpdateRefreshToken(c, refreshToken, newRefreshToken)
+	err = h.tokenRepo.UpdateRefreshToken(c, decodedRefreshToken, newRefreshToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update refresh token"})
 		return
 	}
 
-	encodedRefreshToken, err := h.secureCookie.Encode("refresh", refreshToken)
+	encodedRefreshToken, err := h.secureCookie.Encode("refresh", newRefreshToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode refresh token"})
 		return
 	}
 
 	// Set new session cookie
-	c.SetCookie("session", encodedSession, 3600, "/", "", true, true) // 1 hour expiration, secure, HTTP-only
+	c.SetCookie("session", encodedSession, 60, "/", "", true, true) // 1 hour expiration, secure, HTTP-only
 
 	// Set new refresh cookie
 	c.SetCookie("refresh", encodedRefreshToken, 30*24*3600, "/", "", true, true) // 30 days expiration, secure, HTTP-only

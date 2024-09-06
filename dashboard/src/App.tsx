@@ -1,19 +1,32 @@
-import React from "react";
-import { Switch, Route, Redirect } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./components/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import UserInfo from "./components/UserInfo";
-import { Callback, Logout } from "./components/Callback.tsx";
+import { Callback, Logout } from "./components/Callback";
 
 const App = () => {
   return (
-    <Switch>
-      <Route exact path="/login" component={Login} />
-      <Route path="/callback" component={Callback} />
-      <ProtectedRoute path="/user-info" component={UserInfo} />
-      <ProtectedRoute path="/logout" component={Logout} />
-      <Redirect from="/" to="/user-info" />
-    </Switch>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/callback" element={<Callback />} />
+      <Route
+        path="/user-info"
+        element={
+          <ProtectedRoute>
+            <UserInfo />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/logout"
+        element={
+          <ProtectedRoute>
+            <Logout />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/" element={<Navigate to="/user-info" replace />} />
+    </Routes>
   );
 };
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../utils/api";
-import { Link } from "react-router-dom";
+import { api, isAuthError } from "../utils/api";
+import { Link, useNavigate } from "react-router-dom";
 
 interface UserInfoResponse {
   id: string;
@@ -11,34 +11,26 @@ interface UserInfoResponse {
 }
 
 const fetchUserInfo = async (): Promise<UserInfoResponse> => {
-  try {
-    const response = await api.url("/api/user/profile").get().json();
-    return response as UserInfoResponse;
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      "status" in error &&
-      (error as any).status === 401
-    ) {
-      // If unauthorized, try to refresh the session
-      await api.url("/auth/refresh").post().json();
-      // Retry the original request
-      const retryResponse = await api.url("/api/user/profile").get().json();
-      return retryResponse as UserInfoResponse;
-    }
-    throw error;
-  }
+  return await api.url("/api/user/profile").get().json<UserInfoResponse>();
 };
 
 const UserInfo: React.FC = () => {
+  const navigate = useNavigate();
   const { data, isPending, error } = useQuery({
     queryKey: ["userInfo"],
     queryFn: fetchUserInfo,
-    retry: false, // We're handling retry logic in fetchUserInfo
+    retry: (failureCount, error) => !isAuthError(error) && failureCount < 3,
+    staleTime: 1000 * 60 * 5,
   });
 
+  React.useEffect(() => {
+    if (isAuthError(error)) {
+      navigate("/login");
+    }
+  }, [error, navigate]);
+
   if (isPending) return <div>Loading user info...</div>;
-  if (error) return <div>Error: {(error as Error).message}</div>;
+  if (error) return <div>An error occurred. Please try again later.</div>;
   if (!data) return <div>No user data available</div>;
 
   return (

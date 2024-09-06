@@ -1,16 +1,15 @@
 import React from "react";
-import { Route, Redirect, RouteProps } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../utils/api";
 
-interface ProtectedRouteProps extends RouteProps {
-  component: React.ComponentType<any>;
+interface ProtectedRouteProps {
+  children: React.ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
-  component: Component,
-  ...rest
-}) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const location = useLocation();
+
   const { data: isAuthenticated, isLoading } = useQuery({
     queryKey: ["isAuthenticated"],
     queryFn: () =>
@@ -27,14 +26,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <div>Loading...</div>;
   }
 
-  return (
-    <Route
-      {...rest}
-      render={(props) =>
-        isAuthenticated ? <Component {...props} /> : <Redirect to="/login" />
-      }
-    />
-  );
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

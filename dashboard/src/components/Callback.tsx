@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
-import { useHistory, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../utils/api";
 
 export const Callback = () => {
-  const history = useHistory();
+  const navigate = useNavigate();
   const location = useLocation();
   const hasMutated = useRef(false);
 
@@ -15,7 +15,7 @@ export const Callback = () => {
         .get()
         .json(),
     onSuccess: () => {
-      history.push("/user-info");
+      navigate("/user-info");
     },
     onError: (error) => {
       console.error("Callback error:", error);
@@ -40,12 +40,12 @@ export const Callback = () => {
 };
 
 export const Logout = () => {
-  const history = useHistory();
+  const navigate = useNavigate();
 
   const mutation = useMutation({
     mutationFn: () => api.url("/auth/logout").get().json(),
     onSuccess: () => {
-      history.push("/");
+      navigate("/");
     },
     onError: (error) => {
       console.error("Logout error:", error);
