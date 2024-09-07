@@ -6,3 +6,4 @@ main
 /dashboard/.vite
 .DS_Store
 /dashboard/src/components/__snapshots__/
+/dashboard/coverage/
