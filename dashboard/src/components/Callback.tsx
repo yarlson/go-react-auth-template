@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { api } from "../utils/api";
+import { api } from "../api/apiClient";
 
 export const Callback = () => {
   const navigate = useNavigate();

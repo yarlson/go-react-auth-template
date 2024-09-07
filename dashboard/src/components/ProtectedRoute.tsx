@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../utils/api";
+import { api } from "../api/apiClient";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

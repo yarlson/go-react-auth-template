@@ -5,7 +5,7 @@ import {
   isAuthError,
   isOfflineResponse,
   isServerErrorResponse,
-} from "../utils/api";
+} from "../api/apiClient";
 import { Link, useNavigate } from "react-router-dom";
 
 interface UserInfoResponse {
