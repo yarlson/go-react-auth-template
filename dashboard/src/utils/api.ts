@@ -9,21 +9,54 @@ type Middleware = (
 const authMiddleware: Middleware = (next) => async (url, opts) => {
   const performRequest = async () => {
     try {
-      const response = await next(url, opts);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
+      const response = await next(url, { ...opts, signal: controller.signal });
+      clearTimeout(timeoutId);
+
       if (response.status === 401) {
         throw new Error("Unauthorized");
       }
       return response;
     } catch (error) {
-      // Ignore connection errors and 5xx errors
-      if (
-        error instanceof Error &&
-        (error.message.includes("Failed to fetch") ||
-          (error instanceof Response && error.status >= 500))
-      ) {
-        console.warn("Network or server error occurred, ignoring:", error);
-        return new Response(null, { status: 200 }); // Return a fake 200 response
+      if (error instanceof Error) {
+        if (
+          error.name === "TypeError" ||
+          error.message.includes("NetworkError") ||
+          error.message.includes("Failed to fetch") ||
+          error.name === "AbortError" // Handle timeout
+        ) {
+          return new Response(
+            JSON.stringify({
+              offline: true,
+              debug: error.toString(),
+              timestamp: new Date().toISOString(),
+            }),
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                "X-Offline": "true",
+              },
+            },
+          );
+        }
       }
+
+      if (error instanceof Response && error.status >= 500) {
+        return new Response(
+          JSON.stringify({ serverError: true, status: error.status }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "X-Server-Error": "true",
+            },
+          },
+        );
+      }
+
       throw error;
     }
   };
@@ -31,7 +64,10 @@ const authMiddleware: Middleware = (next) => async (url, opts) => {
   try {
     return await performRequest();
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
+    if (
+      error instanceof Error &&
+      (error.message === "Unauthorized" || error.name === "AbortError")
+    ) {
       try {
         await wretch(BASE_URL)
           .url("/auth/refresh")
@@ -53,3 +89,9 @@ export const api: Wretch = wretch(BASE_URL)
 
 export const isAuthError = (error: unknown): boolean =>
   error instanceof Error && error.message === "AuthError";
+
+export const isOfflineResponse = (response: Response): boolean =>
+  response.headers.get("X-Offline") === "true";
+
+export const isServerErrorResponse = (response: Response): boolean =>
+  response.headers.get("X-Server-Error") === "true";
