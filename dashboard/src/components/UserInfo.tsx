@@ -1,12 +1,9 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  api,
-  isAuthError,
-  isOfflineResponse,
-  isServerErrorResponse,
-} from "../api/apiClient";
-import { Link, useNavigate } from "react-router-dom";
+import { api, isAuthError } from "../api/apiClient";
+import { Link } from "react-router-dom";
+import { useApiError } from "../hooks/useApiError";
+import { ErrorMessage } from "./ErrorMessage.tsx";
 
 interface UserInfoResponse {
   id: string;
@@ -16,23 +13,10 @@ interface UserInfoResponse {
 }
 
 const fetchUserInfo = async (): Promise<UserInfoResponse> => {
-  const response = await api.url("/api/user/profile").get().res();
-
-  if (isOfflineResponse(response)) {
-    const data = await response.json();
-    throw new Error(`Offline: ${data.debug}`);
-  }
-
-  if (isServerErrorResponse(response)) {
-    const data = await response.json();
-    throw new Error(`Server Error: ${data.status}`);
-  }
-
-  return await response.json();
+  return await api.url("/api/user/profile").get().json();
 };
 
 const UserInfo: React.FC = () => {
-  const navigate = useNavigate();
   const { data, isPending, error } = useQuery({
     queryKey: ["userInfo"],
     queryFn: fetchUserInfo,
@@ -40,52 +24,31 @@ const UserInfo: React.FC = () => {
     staleTime: 1000 * 60 * 5,
   });
 
-  useEffect(() => {
-    if (isAuthError(error)) {
-      navigate("/login");
-    }
-  }, [error, navigate]);
+  const errorMessage = useApiError(error);
 
   if (isPending) {
-    return <LoadingMessage />;
+    return <div>Loading user info...</div>;
   }
-  if (error instanceof Error) {
-    return <ErrorMessage error={error} />;
+
+  if (error) {
+    return <ErrorMessage message={errorMessage} />;
   }
 
   if (!data) {
-    return <NoDataMessage />;
+    return <div>No user data available</div>;
   }
 
-  return <UserInfoDisplay data={data} />;
+  return (
+    <div>
+      <h1>User Info</h1>
+      <p>Email: {data.email}</p>
+      <p>First Name: {data.firstName}</p>
+      <p>Last Name: {data.lastName}</p>
+      <p>
+        <Link to="/logout">Logout</Link>
+      </p>
+    </div>
+  );
 };
-
-const LoadingMessage: React.FC = () => <div>Loading user info...</div>;
-
-const ErrorMessage: React.FC<{ error: Error }> = ({ error }) => {
-  if (error.message.startsWith("Offline:")) {
-    return (
-      <div>You are currently offline. Some features may be unavailable.</div>
-    );
-  }
-  if (error.message.startsWith("Server Error:")) {
-    return <div>A server error occurred. Please try again later.</div>;
-  }
-  return <div>An error occurred. Please try again later.</div>;
-};
-
-const NoDataMessage: React.FC = () => <div>No user data available</div>;
-
-const UserInfoDisplay: React.FC<{ data: UserInfoResponse }> = ({ data }) => (
-  <div>
-    <h1>User Info</h1>
-    <p>Email: {data.email}</p>
-    <p>First Name: {data.firstName}</p>
-    <p>Last Name: {data.lastName}</p>
-    <p>
-      <Link to="/logout">Logout</Link>
-    </p>
-  </div>
-);
 
 export default UserInfo;
