@@ -6,6 +6,33 @@ type Middleware = (
   next: (url: string, opts: RequestInit) => Promise<Response>,
 ) => (url: string, opts: RequestInit) => Promise<Response>;
 
+class Mutex {
+  private locked = false;
+  private waitQueue: Array<() => void> = [];
+
+  async acquire(): Promise<void> {
+    if (!this.locked) {
+      this.locked = true;
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      this.waitQueue.push(resolve);
+    });
+  }
+
+  release(): void {
+    if (this.waitQueue.length > 0) {
+      const next = this.waitQueue.shift();
+      if (next) next();
+    } else {
+      this.locked = false;
+    }
+  }
+}
+
+let refreshPromise: Promise<void> | null = null;
+const refreshMutex = new Mutex();
+
 const authMiddleware: Middleware = (next) => async (url, opts) => {
   const performRequest = async () => {
     try {
@@ -61,6 +88,25 @@ const authMiddleware: Middleware = (next) => async (url, opts) => {
     }
   };
 
+  const refreshToken = async () => {
+    await refreshMutex.acquire();
+    try {
+      if (!refreshPromise) {
+        refreshPromise = wretch(BASE_URL)
+          .url("/auth/refresh")
+          .options({ credentials: "include" })
+          .post()
+          .res()
+          .then(() => {
+            refreshPromise = null;
+          });
+      }
+      await refreshPromise;
+    } finally {
+      refreshMutex.release();
+    }
+  };
+
   try {
     return await performRequest();
   } catch (error) {
@@ -69,11 +115,7 @@ const authMiddleware: Middleware = (next) => async (url, opts) => {
       (error.message === "Unauthorized" || error.name === "AbortError")
     ) {
       try {
-        await wretch(BASE_URL)
-          .url("/auth/refresh")
-          .options({ credentials: "include" })
-          .post()
-          .res();
+        await refreshToken();
         return await performRequest();
       } catch (refreshError) {
         throw new Error("AuthError");
