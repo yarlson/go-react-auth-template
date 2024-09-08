@@ -11,6 +11,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Layout from "@/components/Layout";
 
 interface UserInfoResponse {
   id: string;
@@ -33,32 +34,20 @@ const UserInfo: React.FC = () => {
 
   const errorMessage = useApiError(error);
 
-  if (isPending) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        Loading user info...
-      </div>
-    );
-  }
+  const renderContent = () => {
+    if (isPending) {
+      return <div>Loading user info...</div>;
+    }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <ErrorMessage message={errorMessage} />
-      </div>
-    );
-  }
+    if (error) {
+      return <ErrorMessage message={errorMessage} />;
+    }
 
-  if (!data) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        No user data available
-      </div>
-    );
-  }
+    if (!data) {
+      return <div>No user data available</div>;
+    }
 
-  return (
-    <div className="flex items-center justify-center min-h-screen">
+    return (
       <Card className="w-[350px]">
         <CardHeader>
           <CardTitle>
@@ -71,13 +60,15 @@ const UserInfo: React.FC = () => {
           <p>Last Name: {data.lastName}</p>
         </CardContent>
         <CardFooter>
-          <Button>
+          <Button asChild>
             <Link to="/logout">Logout</Link>
           </Button>
         </CardFooter>
       </Card>
-    </div>
-  );
+    );
+  };
+
+  return <Layout>{renderContent()}</Layout>;
 };
 
 export default UserInfo;

@@ -1,9 +1,10 @@
 import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Layout from "@/components/Layout";
 
 const Login = () => {
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <Layout>
       <Card className="w-[350px]">
         <CardHeader>
           <CardTitle>
@@ -18,7 +19,7 @@ const Login = () => {
           </Button>
         </CardFooter>
       </Card>
-    </div>
+    </Layout>
   );
 };
 
