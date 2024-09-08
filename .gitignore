@@ -1,8 +1,7 @@
 main
-.env
+/.env
 /dashboard/node_modules
 /dashboard/dist
-/dashboard/.env
 /dashboard/.vite
 .DS_Store
 /dashboard/src/components/__snapshots__/
