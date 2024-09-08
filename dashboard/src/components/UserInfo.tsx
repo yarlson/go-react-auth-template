@@ -39,8 +39,8 @@ const UserInfo: React.FC = () => {
   }
 
   return (
-    <div>
-      <h1>User Info</h1>
+    <div className="p-4">
+      <h1 className="text-2xl font-bold">User Info</h1>
       <p>Email: {data.email}</p>
       <p>First Name: {data.firstName}</p>
       <p>Last Name: {data.lastName}</p>
