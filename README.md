@@ -1,6 +1,6 @@
 # Go-React Auth Template
 
-This repository is a GitHub template for building web applications with a Go backend and React frontend. It includes cookie-based Google authentication with refresh token functionality and uses Tailwind CSS for styling. The template aims to offer a starting point for developers creating web applications with modern authentication mechanisms.
+This repository is a GitHub template for building web applications with a Go backend and React frontend. It includes cookie-based Google authentication with refresh token functionality and uses Tailwind CSS and shadcn/ui for styling. The template aims to offer a starting point for developers creating web applications with modern authentication mechanisms and beautiful, accessible UI components.
 
 ## 📋 Table of Contents
 
@@ -19,6 +19,7 @@ This repository is a GitHub template for building web applications with a Go bac
 - Go backend using Gin web framework
 - React frontend with TypeScript
 - Tailwind CSS for utility-first styling
+- shadcn/ui for beautiful, accessible UI components
 - Google OAuth integration
 - Secure cookie-based authentication
 - Refresh token mechanism for persistent sessions
