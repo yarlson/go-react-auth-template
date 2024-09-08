@@ -2,12 +2,12 @@ package repository
 
 import (
 	"context"
-	"goauth/model"
 	"time"
 
 	"github.com/google/uuid"
-
 	"gorm.io/gorm"
+
+	"backend/model"
 )
 
 type UserRepository struct {
@@ -43,7 +43,7 @@ func (r *UserRepository) GetOrCreateUser(ctx context.Context, email, firstName, 
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (model.User, error) {
 	var user model.User
-	result := r.db.WithContext(ctx).First(&user, id)
+	result := r.db.WithContext(ctx).First(&user, "id = ?", id.String())
 
 	return user, result.Error
 }

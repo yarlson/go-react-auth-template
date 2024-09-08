@@ -22,7 +22,7 @@ This repository is a GitHub template for building web applications with a Go bac
 - Google OAuth integration
 - Secure cookie-based authentication
 - Refresh token mechanism for persistent sessions
-- PostgreSQL database for user and token storage
+- SQLite database for user and token storage
 - CORS configuration for local development
 - Monorepo structure using Turborepo
 
@@ -36,9 +36,56 @@ To use this template:
 
 After creating your repository, clone it locally:
 
+```bash
+git clone https://github.com/yourusername/your-repo-name.git
+cd your-repo-name
+```
+
+## 📋 Prerequisites
+
+- Node.js (v14 or later)
+- Go (v1.16 or later)
+- Google Cloud Platform account (for OAuth credentials)
+
+## 🔧 Configuration
+
+The backend service requires several environment variables to be set. Create a `.env` file in the `services/backend/` directory with the following variables:
+
+```
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_HOSTED_DOMAIN=
+GOOGLE_REDIRECT_URL=http://localhost:5173/callback
+JWT_SECRET=your_jwt_secret
+HASH_KEY=your_hash_key
+BLOCK_KEY=your_block_key
+```
+
+Replace the placeholder values with your actual configuration. Never commit this file to version control.
+
+For security reasons:
+
+- Use strong, unique values for JWT_SECRET, HASH_KEY, and BLOCK_KEY
+- Keep your Google client credentials confidential
+- In production, use a secure method to manage environment variables
+
+## 🚀 Usage
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
 3. To run tests:
 
-   ```
+   ```bash
    npm run test
    ```
 

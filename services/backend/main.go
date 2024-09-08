@@ -2,26 +2,26 @@ package main
 
 import (
 	"fmt"
-	"goauth/model"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"gorm.io/driver/postgres"
+
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"goauth/auth"
-	"goauth/repository"
+	"backend/auth"
+	"backend/model"
+	"backend/repository"
 )
 
 func main() {
 	_ = godotenv.Load(".env")
 
 	// Initialize database
-	db, err := gorm.Open(postgres.Open(os.Getenv("DATABASE_URL")), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("app.db"), &gorm.Config{}) // Change this line
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}

@@ -3,7 +3,6 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
-	"goauth/repository"
 	"net/http"
 	"os"
 
@@ -12,6 +11,8 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/providers/google"
+
+	"backend/repository"
 )
 
 type Handler struct {
