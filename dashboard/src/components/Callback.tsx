@@ -13,7 +13,10 @@ export const Callback = () => {
 
   const mutation = useMutation<Response, unknown, string>({
     mutationFn: (callbackUrl: string) =>
-      api.url(`/auth/google/callback${callbackUrl}&provider=google`).get().json(),
+      api
+        .url(`/auth/google/callback${callbackUrl}&provider=google`)
+        .get()
+        .json(),
     onSuccess: () => navigate("/user-info"),
   });
 

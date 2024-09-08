@@ -1,14 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useNavigate, useLocation } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Callback, Logout } from './Callback';
-import * as apiModule from '../api/apiClient';
-import * as useApiErrorModule from '../hooks/useApiError';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, useNavigate, useLocation } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Callback, Logout } from "./Callback";
+import * as apiModule from "../api/apiClient";
+import * as useApiErrorModule from "../hooks/useApiError";
 
 // Mock react-router-dom
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual("react-router-dom");
   return {
     ...actual,
     useNavigate: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('react-router-dom', async () => {
 });
 
 // Mock the entire api module
-vi.mock('../api/apiClient', () => ({
+vi.mock("../api/apiClient", () => ({
   api: {
     url: vi.fn().mockReturnThis(),
     get: vi.fn().mockReturnThis(),
@@ -27,7 +27,7 @@ vi.mock('../api/apiClient', () => ({
 }));
 
 // Mock useApiError hook
-vi.mock('../hooks/useApiError', () => ({
+vi.mock("../hooks/useApiError", () => ({
   useApiError: vi.fn(),
 }));
 
@@ -51,20 +51,20 @@ const renderWithProviders = (component: React.ReactElement) => {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>{component}</MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 };
 
-describe('Callback', () => {
+describe("Callback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetAllMocks();
-    (useLocation as any).mockReturnValue({ search: '?code=test' });
+    (useLocation as any).mockReturnValue({ search: "?code=test" });
     (useNavigate as any).mockReturnValue(vi.fn());
-    (useApiErrorModule.useApiError as any).mockReturnValue('');
+    (useApiErrorModule.useApiError as any).mockReturnValue("");
   });
 
-  it('handles successful login', async () => {
+  it("handles successful login", async () => {
     (apiModule.api.url as any).mockReturnValue({
       get: vi.fn().mockReturnThis(),
       json: vi.fn().mockResolvedValue({}),
@@ -77,15 +77,15 @@ describe('Callback', () => {
     await waitFor(() => {
       expect(screen.getByText(/login successful/i)).toBeInTheDocument();
     });
-    expect(navigate).toHaveBeenCalledWith('/user-info');
+    expect(navigate).toHaveBeenCalledWith("/user-info");
   });
 
-  it('handles login error', async () => {
+  it("handles login error", async () => {
     (apiModule.api.url as any).mockReturnValue({
       get: vi.fn().mockReturnThis(),
-      json: vi.fn().mockRejectedValue(new Error('Login failed')),
+      json: vi.fn().mockRejectedValue(new Error("Login failed")),
     });
-    (useApiErrorModule.useApiError as any).mockReturnValue('Login failed');
+    (useApiErrorModule.useApiError as any).mockReturnValue("Login failed");
 
     renderWithProviders(<Callback />);
 
@@ -94,30 +94,34 @@ describe('Callback', () => {
     });
   });
 
-  it('handles offline scenario', async () => {
+  it("handles offline scenario", async () => {
     (apiModule.api.url as any).mockReturnValue({
       get: vi.fn().mockReturnThis(),
-      json: vi.fn().mockRejectedValue(new Error('Offline: Network error')),
+      json: vi.fn().mockRejectedValue(new Error("Offline: Network error")),
     });
-    (useApiErrorModule.useApiError as any).mockReturnValue('You are currently offline. Some features may be unavailable.');
+    (useApiErrorModule.useApiError as any).mockReturnValue(
+      "You are currently offline. Some features may be unavailable.",
+    );
 
     renderWithProviders(<Callback />);
 
     await waitFor(() => {
-      expect(screen.getByText(/You are currently offline/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/You are currently offline/i),
+      ).toBeInTheDocument();
     });
   });
 });
 
-describe('Logout', () => {
+describe("Logout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetAllMocks();
     (useNavigate as any).mockReturnValue(vi.fn());
-    (useApiErrorModule.useApiError as any).mockReturnValue('');
+    (useApiErrorModule.useApiError as any).mockReturnValue("");
   });
 
-  it('calls logout API and navigates to home', async () => {
+  it("calls logout API and navigates to home", async () => {
     (apiModule.api.url as any).mockReturnValue({
       get: vi.fn().mockReturnValue({ json: vi.fn().mockResolvedValue({}) }),
     });
@@ -127,16 +131,20 @@ describe('Logout', () => {
     renderWithProviders(<Logout />);
 
     await waitFor(() => {
-      expect(apiModule.api.url).toHaveBeenCalledWith('/auth/logout');
-      expect(navigate).toHaveBeenCalledWith('/');
+      expect(apiModule.api.url).toHaveBeenCalledWith("/auth/logout");
+      expect(navigate).toHaveBeenCalledWith("/");
     });
   });
 
-  it('handles logout error', async () => {
+  it("handles logout error", async () => {
     (apiModule.api.url as any).mockReturnValue({
-      get: vi.fn().mockReturnValue({ json: vi.fn().mockRejectedValue(new Error('Logout failed')) }),
+      get: vi
+        .fn()
+        .mockReturnValue({
+          json: vi.fn().mockRejectedValue(new Error("Logout failed")),
+        }),
     });
-    (useApiErrorModule.useApiError as any).mockReturnValue('Logout failed');
+    (useApiErrorModule.useApiError as any).mockReturnValue("Logout failed");
 
     renderWithProviders(<Logout />);
 
@@ -145,14 +153,18 @@ describe('Logout', () => {
     });
   });
 
-  it('handles auth error during logout', async () => {
+  it("handles auth error during logout", async () => {
     (apiModule.api.url as any).mockReturnValue({
-      get: vi.fn().mockReturnValue({ json: vi.fn().mockRejectedValue(new Error('AuthError')) }),
+      get: vi
+        .fn()
+        .mockReturnValue({
+          json: vi.fn().mockRejectedValue(new Error("AuthError")),
+        }),
     });
     (useApiErrorModule.useApiError as any).mockImplementation(() => {
       const navigate = useNavigate();
-      navigate('/login');
-      return 'Auth Error';
+      navigate("/login");
+      return "Auth Error";
     });
 
     const navigate = vi.fn();
@@ -161,7 +173,7 @@ describe('Logout', () => {
     renderWithProviders(<Logout />);
 
     await waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith('/login');
+      expect(navigate).toHaveBeenCalledWith("/login");
     });
   });
 });
