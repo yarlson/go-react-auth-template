@@ -10,10 +10,11 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest watch",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "format": "prettier --write . && biome format --write ."
   },
   "dependencies": {
-    "@fontsource/inter": "^5.0.20",
+    "@fontsource/inter": "^5.0.21",
     "@tanstack/react-query": "^5.55.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -31,11 +32,13 @@
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^2.0.5",
     "autoprefixer": "^10.4.20",
+    "biome": "^0.3.3",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.11",
     "jsdom": "^25.0.0",
     "postcss": "^8.4.45",
+    "prettier": "^3.3.3",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.4",
     "vite": "^5.4.3",

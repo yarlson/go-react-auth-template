@@ -138,11 +138,9 @@ describe("Logout", () => {
 
   it("handles logout error", async () => {
     (apiModule.api.url as any).mockReturnValue({
-      get: vi
-        .fn()
-        .mockReturnValue({
-          json: vi.fn().mockRejectedValue(new Error("Logout failed")),
-        }),
+      get: vi.fn().mockReturnValue({
+        json: vi.fn().mockRejectedValue(new Error("Logout failed")),
+      }),
     });
     (useApiErrorModule.useApiError as any).mockReturnValue("Logout failed");
 
@@ -155,11 +153,9 @@ describe("Logout", () => {
 
   it("handles auth error during logout", async () => {
     (apiModule.api.url as any).mockReturnValue({
-      get: vi
-        .fn()
-        .mockReturnValue({
-          json: vi.fn().mockRejectedValue(new Error("AuthError")),
-        }),
+      get: vi.fn().mockReturnValue({
+        json: vi.fn().mockRejectedValue(new Error("AuthError")),
+      }),
     });
     (useApiErrorModule.useApiError as any).mockImplementation(() => {
       const navigate = useNavigate();
