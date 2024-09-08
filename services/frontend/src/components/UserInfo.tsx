@@ -4,6 +4,14 @@ import { api, isAuthError } from "../api/apiClient";
 import { Link } from "react-router-dom";
 import { useApiError } from "../hooks/useApiError";
 import { ErrorMessage } from "./ErrorMessage.tsx";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button.tsx";
 
 interface UserInfoResponse {
   id: string;
@@ -27,26 +35,46 @@ const UserInfo: React.FC = () => {
   const errorMessage = useApiError(error);
 
   if (isPending) {
-    return <div>Loading user info...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        Loading user info...
+      </div>
+    );
   }
 
   if (error) {
-    return <ErrorMessage message={errorMessage} />;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <ErrorMessage message={errorMessage} />
+      </div>
+    );
   }
 
   if (!data) {
-    return <div>No user data available</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        No user data available
+      </div>
+    );
   }
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold">User Info</h1>
-      <p>Email: {data.email}</p>
-      <p>First Name: {data.firstName}</p>
-      <p>Last Name: {data.lastName}</p>
-      <p>
-        <Link to="/logout">Logout</Link>
-      </p>
+    <div className="flex items-center justify-center min-h-screen">
+      <Card className="w-[350px]">
+        <CardHeader>
+          <CardTitle>User Info</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Email: {data.email}</p>
+          <p>First Name: {data.firstName}</p>
+          <p>Last Name: {data.lastName}</p>
+        </CardContent>
+        <CardFooter>
+          <Button>
+            <Link to="/logout">Logout</Link>
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 };
