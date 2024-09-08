@@ -1,0 +1,12 @@
+{
+  "name": "backend",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "go run main.go",
+    "build": "go build -o dist/backend",
+    "test": "go test ./...",
+    "lint": "golangci-lint run",
+    "format": "goimports -w ."
+  }
+}

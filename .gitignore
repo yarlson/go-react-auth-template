@@ -1,8 +1,8 @@
-main
-/.env
-/dashboard/node_modules
-/dashboard/dist
-/dashboard/.vite
 .DS_Store
-/dashboard/src/components/__snapshots__/
-/dashboard/coverage/
+.turbo/
+/node_modules/
+/services/backend/.env
+/services/backend/dist/
+/services/frontend/coverage/
+/services/frontend/dist/
+/services/frontend/node_modules/

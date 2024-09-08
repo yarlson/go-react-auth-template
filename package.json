@@ -1,0 +1,18 @@
+{
+  "name": "go-react-auth-template",
+  "private": true,
+  "workspaces": [
+    "services/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.1"
+  },
+  "packageManager": "npm@10.2.4"
+}
