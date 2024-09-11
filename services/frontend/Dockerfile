@@ -1,38 +1,25 @@
 ARG NODE_VERSION=20.11.1
 
-FROM node:${NODE_VERSION}-alpine as base
+FROM node:${NODE_VERSION}-alpine AS base
+WORKDIR /app
 
-WORKDIR /usr/src/app
-
-FROM base as deps
-
-RUN --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=package-lock.json,target=package-lock.json \
-    --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev
-
-FROM deps as build
-
-RUN --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=package-lock.json,target=package-lock.json \
-    --mount=type=cache,target=/root/.npm \
-    npm ci
-
+FROM base AS pruner
 COPY . .
+RUN npx turbo prune --scope=frontend --docker
+
+FROM base AS installer
+COPY --from=pruner /app/out/json/ .
+COPY --from=pruner /app/out/package-lock.json ./package-lock.json
+RUN npm ci
+
+FROM installer AS builder
+COPY --from=pruner /app/out/full/ .
 RUN npm run build
 
-FROM base as final
+FROM nginx:alpine AS final
+COPY --from=builder /app/services/frontend/dist/ /usr/share/nginx/html
+COPY services/frontend/config/nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
-ENV NODE_ENV production
+EXPOSE 80
 
-USER node
-
-COPY package.json .
-
-COPY --from=deps /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/dist ./dist
-
-
-EXPOSE 5173
-
-CMD npm run start
+CMD ["nginx", "-g", "daemon off;"]

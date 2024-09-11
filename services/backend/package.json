@@ -7,6 +7,7 @@
     "build": "go build -o dist/backend",
     "test": "go test ./...",
     "lint": "golangci-lint run",
-    "format": "goimports -w ."
+    "format": "goimports -w .",
+    "docker:build": "docker build -t go-react-auth-template-backend -f Dockerfile ."
   }
 }
