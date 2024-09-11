@@ -84,13 +84,13 @@ For security reasons:
    npm run dev
    ```
 
-3. To run tests:
+3. Run tests:
 
    ```bash
    npm run test
    ```
 
-4. To build the Docker image:
+4. Build the Docker image:
    ```bash
    npm run docker:build
    ```
