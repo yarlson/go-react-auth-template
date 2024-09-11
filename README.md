@@ -90,6 +90,11 @@ For security reasons:
    npm run test
    ```
 
+4. To build the Docker image:
+   ```bash
+   npm run docker:build
+   ```
+
 ## 📖 API Documentation
 
 ### Authentication Endpoints
