@@ -56,6 +56,11 @@ func main() {
 	config.AllowCredentials = true
 	r.Use(cors.New(config))
 
+	// Health check
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
 	// Auth routes
 	r.GET("/auth/google", authHandler.HandleLogin)
 	r.GET("/auth/google/callback", authHandler.HandleCallback)

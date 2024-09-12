@@ -21,6 +21,7 @@ FROM debian:bookworm-slim AS final
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     tzdata \
+    curl \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -34,7 +35,7 @@ RUN adduser \
     --uid "${UID}" \
     appuser
 
-RUN mkdir -p /src/data && chown appuser:appuser /src/data
+RUN mkdir -p /app/data && chown appuser:appuser /app/data
 
 USER appuser
 
