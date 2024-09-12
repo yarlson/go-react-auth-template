@@ -52,7 +52,7 @@ func main() {
 
 	// Configure CORS
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:5173", "http://localhost:4173"}
+	config.AllowOrigins = []string{"http://localhost:5173", "http://localhost:4173", "http://localhost"}
 	config.AllowCredentials = true
 	r.Use(cors.New(config))
 
@@ -62,13 +62,16 @@ func main() {
 	})
 
 	// Auth routes
-	r.GET("/auth/google", authHandler.HandleLogin)
-	r.GET("/auth/google/callback", authHandler.HandleCallback)
-	r.POST("/auth/refresh", authHandler.HandleRefresh)
-	r.GET("/auth/logout", authHandler.HandleLogout)
+	authGroup := r.Group("/api/v1/auth")
+	{
+		authGroup.GET("/google", authHandler.HandleLogin)
+		authGroup.GET("/google/callback", authHandler.HandleCallback)
+		authGroup.POST("/refresh", authHandler.HandleRefresh)
+		authGroup.GET("/logout", authHandler.HandleLogout)
+	}
 
 	// Protected routes
-	authorized := r.Group("/api")
+	authorized := r.Group("/api/v1")
 	authorized.Use(authHandler.AuthMiddleware())
 	{
 		authorized.GET("/user/profile", handleUserProfile())

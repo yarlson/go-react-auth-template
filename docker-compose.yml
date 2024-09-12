@@ -8,17 +8,10 @@ services:
     ports:
       - "80:80"
     depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - backend
     environment:
-      - BACKEND_URL=http://backend:8080
-    networks:
-      - app_network
+      - BACKEND_URL=backend:8080
+    restart: unless-stopped
 
   backend:
     build:
@@ -30,21 +23,11 @@ services:
       - "8080:8080"
     volumes:
       - sqlite_data:/app/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     environment:
       - SQLITE_DB_PATH=/app/data/myapp.db
     env_file:
       - services/backend/.env
-    networks:
-      - app_network
+    restart: unless-stopped
 
 volumes:
   sqlite_data:
-
-networks:
-  app_network:
-    driver: bridge

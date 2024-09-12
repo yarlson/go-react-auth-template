@@ -34,7 +34,7 @@ func NewHandler(userRepo *repository.UserRepository, tokenRepo *repository.Token
 		google.New(
 			os.Getenv("GOOGLE_CLIENT_ID"),
 			os.Getenv("GOOGLE_CLIENT_SECRET"),
-			"http://localhost:5173/callback",
+			"http://localhost/callback",
 			"https://www.googleapis.com/auth/userinfo.profile",
 			"https://www.googleapis.com/auth/userinfo.email",
 		),

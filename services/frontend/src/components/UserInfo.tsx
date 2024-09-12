@@ -21,7 +21,7 @@ interface UserInfoResponse {
 }
 
 const fetchUserInfo = async (): Promise<UserInfoResponse> => {
-  return await api.url("/api/user/profile").get().json();
+  return await api.url("/user/profile").get().json();
 };
 
 const UserInfo: React.FC = () => {
