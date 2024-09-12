@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -21,7 +22,11 @@ func main() {
 	_ = godotenv.Load(".env")
 
 	// Initialize database
-	db, err := gorm.Open(sqlite.Open("app.db"), &gorm.Config{}) // Change this line
+	dbPath := os.Getenv("SQLITE_DB_PATH")
+	if dbPath == "" {
+		dbPath = "data/app.db" // Default path if env var is not set
+	}
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{}) // Change this line
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}

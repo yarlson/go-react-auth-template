@@ -2,7 +2,7 @@
 .turbo/
 /node_modules/
 /services/backend/.env
-/services/backend/app.db
+/services/backend/data/
 /services/backend/dist/
 /services/frontend/coverage/
 /services/frontend/dist/

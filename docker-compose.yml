@@ -1,0 +1,50 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
+      args:
+        NODE_VERSION: 20.11.1
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    environment:
+      - BACKEND_URL=http://backend:8080
+    networks:
+      - app_network
+
+  backend:
+    build:
+      context: services/backend
+      dockerfile: Dockerfile
+      args:
+        GO_VERSION: 1.23
+    ports:
+      - "8080:8080"
+    volumes:
+      - sqlite_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    environment:
+      - SQLITE_DB_PATH=/app/data/myapp.db
+    env_file:
+      - services/backend/.env
+    networks:
+      - app_network
+
+volumes:
+  sqlite_data:
+
+networks:
+  app_network:
+    driver: bridge
