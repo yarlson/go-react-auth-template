@@ -9,6 +9,7 @@ This repository is a GitHub template for building web applications with a Go bac
 - [Prerequisites](#-prerequisites)
 - [Configuration](#-configuration)
 - [Usage](#-usage)
+- [Docker Compose](#-docker-compose)
 - [API Documentation](#-api-documentation)
 - [Project Structure](#-project-structure)
 - [Contributing](#-contributing)
@@ -26,6 +27,7 @@ This repository is a GitHub template for building web applications with a Go bac
 - SQLite database for user and token storage
 - CORS configuration for local development
 - Monorepo structure using Turborepo
+- Docker Compose setup for easy deployment
 
 ## 🚀 Getting Started
 
@@ -47,6 +49,7 @@ cd your-repo-name
 - Node.js (v14 or later)
 - Go (v1.16 or later)
 - Google Cloud Platform account (for OAuth credentials)
+- Docker and Docker Compose (for containerized deployment)
 
 ## 🔧 Configuration
 
@@ -95,6 +98,126 @@ For security reasons:
    npm run docker:build
    ```
 
+## 🐳 Docker Compose
+
+This project includes a `docker-compose.yml` file for easy deployment of the entire stack.
+
+### Building and Running
+
+1. Make sure you're in the project root directory.
+
+2. Build and start the containers:
+
+   ```bash
+   docker-compose up --build
+   ```
+
+   This command will build the images for both the frontend and backend services and start the containers.
+
+3. Access the application:
+   - Frontend: http://localhost
+   - Backend: http://localhost:8080
+
+### Configuration
+
+The `docker-compose.yml` file defines two services:
+
+#### Frontend Service
+
+- Built from `services/frontend/Dockerfile`
+- Uses Node.js version 20.11.1
+- Exposed on port 80
+- Depends on the backend service
+- Has a healthcheck that curls localhost every 30 seconds
+- Connects to the backend using the `BACKEND_URL` environment variable
+
+#### Backend Service
+
+- Built from `services/backend/Dockerfile`
+- Uses Go version 1.23
+- Exposed on port 8080
+- Uses a volume for SQLite data persistence
+- Has a healthcheck that curls the `/health` endpoint every 30 seconds
+- Uses environment variables from `services/backend/.env` file
+
+### Volumes
+
+- `sqlite_data`: Persists the SQLite database file
+
+### Networks
+
+- `app_network`: A bridge network for communication between services
+
+### Stopping the Stack
+
+To stop the running containers:
+
+```bash
+docker-compose down
+```
+
+To stop the containers and remove the volumes:
+
+```bash
+docker-compose down -v
+```
+
+### Viewing Logs
+
+To view logs from all services:
+
+```bash
+docker-compose logs
+```
+
+To follow logs from a specific service:
+
+```bash
+docker-compose logs -f frontend
+```
+
+or
+
+```bash
+docker-compose logs -f backend
+```
+
+### Rebuilding
+
+If you make changes to the code, rebuild the images:
+
+```bash
+docker-compose build
+```
+
+Then restart the services:
+
+```bash
+docker-compose up
+```
+
+### Troubleshooting
+
+1. If services fail to start, check the logs for error messages:
+
+   ```bash
+   docker-compose logs
+   ```
+
+2. Ensure all required environment variables are set in the `services/backend/.env` file.
+
+3. If changes aren't reflecting, try rebuilding the images:
+
+   ```bash
+   docker-compose build --no-cache
+   ```
+
+4. Check if all services are running:
+
+   ```bash
+   docker-compose ps
+   ```
+
 ## 📖 API Documentation
 
 ### Authentication Endpoints
@@ -127,6 +250,7 @@ All protected endpoints require a valid session cookie.
 │       └── ...
 ├── package.json
 ├── turbo.json
+├── docker-compose.yml
 └── README.md
 ```
 
