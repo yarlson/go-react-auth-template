@@ -1,9 +1,11 @@
 .DS_Store
+.env
 .turbo/
 /node_modules/
 /services/backend/.env
-/services/backend/data/
+/services/backend/data/*.db
 /services/backend/dist/
+/services/frontend/.env
 /services/frontend/coverage/
 /services/frontend/dist/
 /services/frontend/node_modules/

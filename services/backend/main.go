@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -21,12 +22,12 @@ import (
 func main() {
 	_ = godotenv.Load(".env")
 
-	// Initialize database
 	dbPath := os.Getenv("SQLITE_DB_PATH")
 	if dbPath == "" {
-		dbPath = "data/app.db" // Default path if env var is not set
+		dbPath = "data/app.db"
 	}
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{}) // Change this line
+
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -47,34 +48,36 @@ func main() {
 		log.Fatalf("Failed to initialize auth handler: %v", err)
 	}
 
+	handlePing := func() gin.HandlerFunc {
+		return func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"message": "pong"})
+		}
+	}
+
 	// Set up Gin router
 	r := gin.Default()
 
-	// Configure CORS
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:5173", "http://localhost:4173", "http://localhost"}
-	config.AllowCredentials = true
+	config := cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:4173"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}
 	r.Use(cors.New(config))
 
-	// Health check
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
-
 	// Auth routes
-	authGroup := r.Group("/api/v1/auth")
-	{
-		authGroup.GET("/google", authHandler.HandleLogin)
-		authGroup.GET("/google/callback", authHandler.HandleCallback)
-		authGroup.POST("/refresh", authHandler.HandleRefresh)
-		authGroup.GET("/logout", authHandler.HandleLogout)
-	}
+	r.GET("/auth/google", authHandler.HandleLogin)
+	r.GET("/auth/google/callback", authHandler.HandleCallback)
+	r.POST("/auth/refresh", authHandler.HandleRefresh)
+	r.GET("/auth/logout", authHandler.HandleLogout)
 
 	// Protected routes
-	authorized := r.Group("/api/v1")
+	authorized := r.Group("/api")
 	authorized.Use(authHandler.AuthMiddleware())
 	{
 		authorized.GET("/user/profile", handleUserProfile())
+		authorized.GET("/ping", handlePing())
 	}
 
 	fmt.Println("Server is running on http://localhost:8080")

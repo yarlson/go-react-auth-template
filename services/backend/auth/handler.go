@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -34,7 +35,7 @@ func NewHandler(userRepo *repository.UserRepository, tokenRepo *repository.Token
 		google.New(
 			os.Getenv("GOOGLE_CLIENT_ID"),
 			os.Getenv("GOOGLE_CLIENT_SECRET"),
-			"http://localhost/callback",
+			os.Getenv("GOOGLE_REDIRECT_URL"),
 			"https://www.googleapis.com/auth/userinfo.profile",
 			"https://www.googleapis.com/auth/userinfo.email",
 		),
@@ -154,7 +155,13 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode refresh token"})
 		return
 	}
-	c.SetSameSite(http.SameSiteStrictMode)
+
+	sameSiteMode := http.SameSiteStrictMode
+	if strings.Contains(c.Request.Host, "localhost") || strings.Contains(c.Request.Host, "127.0.0.1") {
+		sameSiteMode = http.SameSiteNoneMode
+	}
+	c.SetSameSite(sameSiteMode)
+
 	// Set session cookie
 	c.SetCookie("session", encodedSession, 60, "/", "", true, true) // 1 hour expiration, secure, HTTP-only
 

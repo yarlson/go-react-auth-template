@@ -1,6 +1,7 @@
 import wretch, { Wretch } from "wretch";
+import { getApiUrl } from "@/config.ts";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_URL = getApiUrl();
 
 type Middleware = (
   next: (url: string, opts: RequestInit) => Promise<Response>,
@@ -92,7 +93,7 @@ const authMiddleware: Middleware = (next) => async (url, opts) => {
     await refreshMutex.acquire();
     try {
       if (!refreshPromise) {
-        refreshPromise = wretch(BASE_URL)
+        refreshPromise = wretch(API_URL)
           .url("/auth/refresh")
           .options({ credentials: "include" })
           .post()
@@ -125,15 +126,21 @@ const authMiddleware: Middleware = (next) => async (url, opts) => {
   }
 };
 
-export const api: Wretch = wretch(BASE_URL)
+export const api: Wretch = wretch(API_URL)
   .options({ credentials: "include" })
   .middlewares([authMiddleware]);
 
 export const isAuthError = (error: unknown): boolean =>
   error instanceof Error && error.message === "AuthError";
 
-export const isOfflineResponse = (response: Response): boolean =>
-  response.headers.get("X-Offline") === "true";
+export interface UserInfo {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  pictureUrl: string;
+}
 
-export const isServerErrorResponse = (response: Response): boolean =>
-  response.headers.get("X-Server-Error") === "true";
+export const fetchUserInfo = async (): Promise<UserInfo> => {
+  return await api.url("/api/user/profile").get().json();
+};

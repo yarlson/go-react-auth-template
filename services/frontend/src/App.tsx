@@ -1,9 +1,11 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Login from "./components/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
-import UserInfo from "./components/UserInfo";
-import { Callback, Logout } from "./components/Callback";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import Login from "@/pages/Login.tsx";
+import { Callback } from "@/pages/Callback.tsx";
+import UserInfo from "@/pages/UserInfo.tsx";
+import Layout from "@/components/Layout.tsx";
+import { Logout } from "@/pages/Logout.tsx";
 
 const App = () => {
   return (
@@ -12,14 +14,6 @@ const App = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/callback" element={<Callback />} />
         <Route
-          path="/user-info"
-          element={
-            <ProtectedRoute>
-              <UserInfo />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/logout"
           element={
             <ProtectedRoute>
@@ -27,7 +21,17 @@ const App = () => {
             </ProtectedRoute>
           }
         />
-        <Route path="/" element={<Navigate to="/user-info" replace />} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <UserInfo />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<Navigate to="/profile" />} />
       </Routes>
     </ThemeProvider>
   );

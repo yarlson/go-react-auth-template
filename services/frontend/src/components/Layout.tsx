@@ -1,5 +1,5 @@
 import React from "react";
-import { ModeToggle } from "@/components/ModeToggle";
+import { Header } from "@/components/Header";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -7,13 +7,9 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="absolute top-4 right-4">
-        <ModeToggle />
-      </div>
-      <div className="flex-grow flex items-center justify-center">
-        {children}
-      </div>
+    <div className="flex flex-col">
+      <Header />
+      <main className="flex-grow flex justify-center mt-8">{children}</main>
     </div>
   );
 };

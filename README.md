@@ -1,6 +1,6 @@
 # Go-React Auth Template
 
-This repository is a GitHub template for building web applications with a Go backend and React frontend. It includes cookie-based Google authentication with refresh token functionality and uses Tailwind CSS and shadcn/ui for styling. The template aims to offer a starting point for developers creating web applications with modern authentication mechanisms and beautiful, accessible UI components.
+A template for building web applications with a Go backend and a React frontend. It includes cookie-based Google authentication with refresh token functionality and uses Tailwind CSS and shadcn/ui for styling. The project integrates Traefik for reverse proxy management and automatic SSL certificates with Let's Encrypt for production deployments. Docker Compose is used for containerization in production. The monorepo structure uses Turborepo for efficient project management and builds.
 
 ## 📋 Table of Contents
 
@@ -9,7 +9,7 @@ This repository is a GitHub template for building web applications with a Go bac
 - [Prerequisites](#-prerequisites)
 - [Configuration](#-configuration)
 - [Usage](#-usage)
-- [Docker Compose](#-docker-compose)
+- [Production Deployment with Docker Compose](#-production-deployment-with-docker-compose)
 - [API Documentation](#-api-documentation)
 - [Project Structure](#-project-structure)
 - [Contributing](#-contributing)
@@ -17,45 +17,47 @@ This repository is a GitHub template for building web applications with a Go bac
 
 ## ✨ Features
 
-- Go backend using Gin web framework
+- Go backend using Gin framework
 - React frontend with TypeScript
-- Tailwind CSS for utility-first styling
-- shadcn/ui for beautiful, accessible UI components
-- Google OAuth integration
-- Secure cookie-based authentication
-- Refresh token mechanism for persistent sessions
-- SQLite database for user and token storage
-- CORS configuration for local development
-- Monorepo structure using Turborepo
-- Docker Compose setup for easy deployment
+- Tailwind CSS and shadcn/ui for styling
+- Cookie-based Google OAuth authentication with refresh token support
+- Traefik reverse proxy with automatic Let's Encrypt SSL certificates (production)
+- Docker Compose setup for containerized production deployment
+- Monorepo structure managed with Turborepo
 
 ## 🚀 Getting Started
 
 To use this template:
 
-1. Click the "Use this template" button at the top of this repository.
-2. Choose a name for your new repository and select its visibility.
-3. Click "Create repository from template".
+1. **Use the Template:**
 
-After creating your repository, clone it locally:
+   - Click the "Use this template" button at the top of this repository.
+   - Name your new repository and set its visibility.
+   - Click "Create repository from template".
 
-```bash
-git clone https://github.com/yourusername/your-repo-name.git
-cd your-repo-name
-```
+2. **Clone the Repository:**
+
+   ```bash
+   git clone https://github.com/yourusername/your-repo-name.git
+   cd your-repo-name
+   ```
 
 ## 📋 Prerequisites
 
-- Node.js (v14 or later)
-- Go (v1.16 or later)
-- Google Cloud Platform account (for OAuth credentials)
-- Docker and Docker Compose (for containerized deployment)
+- **Node.js** (v20 or later)
+- **Go** (v1.23 or later)
+- **Google Cloud Platform Account** (for OAuth credentials)
+- **Docker & Docker Compose** (for production deployment)
+- **Domain Name** (pointing to your server's IP address for production)
+- **Valid Email Address** (for Let's Encrypt SSL certificate registration in production)
 
 ## 🔧 Configuration
 
-The backend service requires several environment variables to be set. Create a `.env` file in the `services/backend/` directory with the following variables:
+### Backend Configuration
 
-```
+Create a `.env` file in the `services/backend/` directory with the following variables:
+
+```env
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_HOSTED_DOMAIN=
@@ -65,173 +67,192 @@ HASH_KEY=your_hash_key
 BLOCK_KEY=your_block_key
 ```
 
-Replace the placeholder values with your actual configuration. Never commit this file to version control.
+- For local development, set `GOOGLE_REDIRECT_URL` to `http://localhost:5173/callback`.
+- Replace the placeholder values with your actual configuration.
 
-For security reasons:
+### Root Configuration (Production Only)
 
-- Use strong, unique values for JWT_SECRET, HASH_KEY, and BLOCK_KEY
-- Keep your Google client credentials confidential
-- In production, use a secure method to manage environment variables
+For production deployment, create a `.env` file in the **project root directory** with:
+
+```env
+ACME_EMAIL=your_email@example.com
+DOMAIN_NAME=yourdomain.com
+```
+
+- Replace `your_email@example.com` with your email.
+- Replace `yourdomain.com` with your domain.
+
+### DNS Configuration (Production Only)
+
+Ensure your domain name points to your server's IP address for SSL certificate validation.
 
 ## 🚀 Usage
 
-1. Install dependencies:
+### Local Development
+
+1. **Install Dependencies:**
 
    ```bash
    npm install
    ```
 
-2. Start the development server:
+2. **Start Backend Server:**
+
+   Navigate to the backend service directory and run the server:
 
    ```bash
+   cd services/backend
+   go run main.go
+   ```
+
+   The backend server will start on port `8080` by default.
+
+3. **Start Frontend Development Server:**
+
+   Open a new terminal window, navigate to the frontend service directory, and start the development server:
+
+   ```bash
+   cd services/frontend
+   npm install
    npm run dev
    ```
 
-3. Run tests:
+   The frontend development server will start on `http://localhost:5173`.
+
+4. **Run Tests:**
 
    ```bash
    npm run test
    ```
 
-4. Build the Docker image:
-   ```bash
-   npm run docker:build
-   ```
-
-## 🐳 Docker Compose
-
-This project includes a `docker-compose.yml` file for easy deployment of the entire stack.
-
-### Building and Running
-
-1. Make sure you're in the project root directory.
-
-2. Build and start the containers:
+5. **Build the Project:**
 
    ```bash
-   docker-compose up --build
+   npm run build
    ```
 
-   This command will build the images for both the frontend and backend services and start the containers.
+6. **Lint Code:**
 
-3. Access the application:
-   - Frontend: http://localhost
-   - Backend: http://localhost:8080
+   ```bash
+   npm run lint
+   ```
+
+7. **Format Code:**
+
+   ```bash
+   npm run format
+   ```
+
+### Notes
+
+- The backend server expects the frontend to be running on `http://localhost:5173`.
+- Ensure that the `GOOGLE_REDIRECT_URL` in your backend `.env` file matches the frontend URL.
+
+## 🐳 Production Deployment with Docker Compose
+
+For production deployment, use Docker Compose to build and run the application with Traefik for reverse proxy and automatic SSL.
+
+### Prerequisites
+
+- Ensure you have a domain name pointing to your server's IP address.
+- Ports `80` and `443` should be open and accessible.
 
 ### Configuration
 
-The `docker-compose.yml` file defines two services:
+- Set up the `.env` file in the project root with your production domain and email.
+- Update the `GOOGLE_REDIRECT_URL` in `services/backend/.env` to `https://yourdomain.com/callback`.
 
-#### Frontend Service
+### Building and Running
 
-- Built from `services/frontend/Dockerfile`
-- Uses Node.js version 20.11.1
-- Exposed on port 80
-- Depends on the backend service
-- Has a healthcheck that curls localhost every 30 seconds
-- Connects to the backend using the `BACKEND_URL` environment variable
+1. **Build and Start Containers:**
 
-#### Backend Service
+   ```bash
+   docker-compose up --build -d
+   ```
 
-- Built from `services/backend/Dockerfile`
-- Uses Go version 1.23
-- Exposed on port 8080
-- Uses a volume for SQLite data persistence
-- Has a healthcheck that curls the `/health` endpoint every 30 seconds
-- Uses environment variables from `services/backend/.env` file
+2. **Access the Application:**
+
+   - Frontend: `https://yourdomain.com`
+   - Backend API: `https://yourdomain.com/api`
+
+### Services Overview
+
+- **Traefik Service:**
+  - Reverse proxy and SSL management with Let's Encrypt.
+- **Frontend Service:**
+  - Serves the React application.
+- **Backend Service:**
+  - Provides the API endpoints and authentication.
+
+### Environment Variables
+
+Ensure all required environment variables are set in your `.env` files as per the configuration steps.
 
 ### Volumes
 
-- `sqlite_data`: Persists the SQLite database file
+- `sqlite_data`: Persists the SQLite database.
+- `letsencrypt`: Stores SSL certificates.
 
-### Networks
+### Common Commands
 
-- `app_network`: A bridge network for communication between services
+- **Stop Containers:**
 
-### Stopping the Stack
+  ```bash
+  docker-compose down
+  ```
 
-To stop the running containers:
+- **Stop and Remove Volumes:**
 
-```bash
-docker-compose down
-```
+  ```bash
+  docker-compose down -v
+  ```
 
-To stop the containers and remove the volumes:
+- **View Logs:**
 
-```bash
-docker-compose down -v
-```
+  ```bash
+  docker-compose logs
+  ```
 
-### Viewing Logs
+- **Rebuild Images:**
 
-To view logs from all services:
-
-```bash
-docker-compose logs
-```
-
-To follow logs from a specific service:
-
-```bash
-docker-compose logs -f frontend
-```
-
-or
-
-```bash
-docker-compose logs -f backend
-```
-
-### Rebuilding
-
-If you make changes to the code, rebuild the images:
-
-```bash
-docker-compose build
-```
-
-Then restart the services:
-
-```bash
-docker-compose up
-```
+  ```bash
+  docker-compose build
+  ```
 
 ### Troubleshooting
 
-1. If services fail to start, check the logs for error messages:
+- **Check Logs for Errors:**
 
-   ```bash
-   docker-compose logs
-   ```
+  ```bash
+  docker-compose logs
+  ```
 
-2. Ensure all required environment variables are set in the `services/backend/.env` file.
+- **Verify Environment Variables:**
 
-3. If changes aren't reflecting, try rebuilding the images:
+  Ensure all variables are correctly set.
 
-   ```bash
-   docker-compose build --no-cache
-   ```
+- **Confirm Domain DNS:**
 
-4. Check if all services are running:
+  Your domain should point to your server's IP.
 
-   ```bash
-   docker-compose ps
-   ```
+- **Check Open Ports:**
+
+  Ports 80 and 443 should be accessible.
 
 ## 📖 API Documentation
 
 ### Authentication Endpoints
 
-- `GET /auth/google`: Initiates Google OAuth login
-- `GET /auth/google/callback`: Handles Google OAuth callback
-- `POST /auth/refresh`: Refreshes the user's session
-- `GET /auth/logout`: Logs out the user
+- `GET /auth/google`: Initiate Google OAuth login.
+- `GET /auth/google/callback`: Handle OAuth callback.
+- `POST /auth/refresh`: Refresh user session.
+- `GET /auth/logout`: Log out user.
 
 ### Protected Endpoints
 
-- `GET /api/user/profile`: Retrieves the authenticated user's profile
+- `GET /api/user/profile`: Get authenticated user profile.
 
-All protected endpoints require a valid session cookie.
+_Note: Protected endpoints require a valid session cookie._
 
 ## 🗂 Project Structure
 
@@ -251,24 +272,40 @@ All protected endpoints require a valid session cookie.
 ├── package.json
 ├── turbo.json
 ├── docker-compose.yml
+├── .env           # (Production environment variables)
 └── README.md
 ```
 
 ## 🤝 Contributing
 
-Contributions to improve this template are welcome. Please follow these steps:
+Contributions are welcome.
 
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Commit your changes (`git commit -m 'Add some amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
+1. **Fork the Repository**
+2. **Create a Branch**
+
+   ```bash
+   git checkout -b feature/your-feature
+   ```
+
+3. **Make Changes**
+4. **Commit Changes**
+
+   ```bash
+   git commit -m 'Add your feature'
+   ```
+
+5. **Push to Branch**
+
+   ```bash
+   git push origin feature/your-feature
+   ```
+
+6. **Open a Pull Request**
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-For more information or support, please open an issue on this repository.
+For support or more information, please open an issue on this repository.

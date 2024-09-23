@@ -18,8 +18,8 @@
     "format": {
       "dependsOn": ["^format"]
     },
-    "docker:build": {
-      "dependsOn": ["^docker:build"]
+    "check-types": {
+      "dependsOn": ["^check-types"]
     }
   }
 }
